@@ -1,0 +1,158 @@
+---
+description: Fusion Video Editor coding conventions and patterns
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Coding Conventions
+
+## Imports
+
+```typescript
+// 1. External packages
+import { useState, useEffect } from "react";
+import { create } from "zustand";
+
+// 2. @designcombo packages
+import { dispatch } from "@designcombo/events";
+import StateManager, { DESIGN_LOAD, ADD_VIDEO } from "@designcombo/state";
+
+// 3. Internal aliases (@/)
+import { Button } from "@/components/ui/button";
+import useStore from "@/features/editor/store/use-store";
+```
+
+## Component Patterns
+
+### Feature Components
+```typescript
+// features/editor/menu-item/example.tsx
+"use client";
+
+import { useCallback, memo } from "react";
+import { dispatch } from "@designcombo/events";
+import { ADD_VIDEO } from "@designcombo/state";
+import { generateId } from "@designcombo/timeline";
+
+export const Example = memo(() => {
+  const handleAdd = useCallback(() => {
+    dispatch(ADD_VIDEO, {
+      payload: { id: generateId(), details: { src: "..." } },
+      options: { resourceId: "main", scaleMode: "fit" },
+    });
+  }, []);
+
+  return <div onClick={handleAdd}>...</div>;
+});
+```
+
+### Store Pattern (Zustand)
+```typescript
+// store/use-example-store.ts
+import { create } from "zustand";
+
+interface ExampleState {
+  value: string;
+  setValue: (value: string) => void;
+}
+
+const useExampleStore = create<ExampleState>((set) => ({
+  value: "",
+  setValue: (value) => set({ value }),
+}));
+
+export default useExampleStore;
+```
+
+## API Routes
+
+```typescript
+// app/api/example/route.ts
+import { NextResponse } from "next/server";
+import { getUserFromRequest } from "@/lib/auth-helpers";
+import { supabaseAdmin } from "@/lib/db/supabase-admin";
+
+export async function POST(request: Request) {
+  // 1. Authenticate
+  const user = await getUserFromRequest();
+  if (!user) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  // 2. Parse body
+  const body = await request.json();
+
+  // 3. Database operation (use supabaseAdmin for writes)
+  const { data, error } = await supabaseAdmin
+    .from("table")
+    .insert({ user_id: user.id, ...body })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ data }, { status: 200 });
+}
+```
+
+## Timeline Events
+
+```typescript
+// Dispatching events
+import { dispatch } from "@designcombo/events";
+import { ADD_VIDEO, ADD_IMAGE, ADD_AUDIO, EDIT_OBJECT } from "@designcombo/state";
+
+// Adding items
+dispatch(ADD_VIDEO, {
+  payload: { id: generateId(), details: { src } },
+  options: { resourceId: "main" },
+});
+
+// Editing items
+dispatch(EDIT_OBJECT, {
+  payload: { [itemId]: { details: { ...updates } } },
+});
+```
+
+## Error Handling
+
+```typescript
+// API routes
+try {
+  // operation
+} catch (error) {
+  console.error("Operation failed:", error);
+  return NextResponse.json(
+    { message: error instanceof Error ? error.message : "Unknown error" },
+    { status: 500 }
+  );
+}
+
+// Client-side
+import { toast } from "sonner";
+
+try {
+  await operation();
+  toast.success("Success!");
+} catch (error) {
+  toast.error(error instanceof Error ? error.message : "Operation failed");
+}
+```
+
+## Auth Token Usage
+
+```typescript
+import { getIdToken } from "@/lib/auth/client";
+
+const token = await getIdToken();
+if (!token) {
+  toast.error("Please log in");
+  return;
+}
+
+const response = await fetch("/api/endpoint", {
+  headers: { Authorization: `Bearer ${token}` },
+});
+```

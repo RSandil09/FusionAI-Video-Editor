@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R2 CORS Test - localhost:3000</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+
+        .test-box {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: #10b981;
+        }
+
+        .error {
+            background: #ef4444;
+        }
+
+        img {
+            max-width: 400px;
+            margin-top: 10px;
+            border: 2px solid #444;
+        }
+
+        pre {
+            background: #000;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔍 R2 CORS Test from localhost:3000</h1>
+
+    <div class="test-box">
+        <h2>Test 1: Simple Image Load (No CORS)</h2>
+        <div id="test1-status"></div>
+        <img id="test1-img" alt="Test Image" />
+    </div>
+
+    <div class="test-box">
+        <h2>Test 2: Image with crossOrigin="anonymous" ⭐</h2>
+        <p>This is what the timeline needs - if this fails, CORS headers are missing!</p>
+        <div id="test2-status"></div>
+        <img id="test2-img" alt="Test Image with CORS" />
+    </div>
+
+    <div class="test-box">
+        <h2>Test 3: Fetch API (CORS required)</h2>
+        <div id="test3-status"></div>
+    </div>
+
+    <div class="test-box">
+        <h2>Console Output</h2>
+        <pre id="console-output"></pre>
+    </div>
+
+    <script>
+        const IMAGE_URL = 'https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/users/MCiyBbnGWadUkLDqGBgOUVeicaA3/uploads/1770884527642-626871908_1259912232649041_2515516117265442998_n.jpg';
+
+        let consoleLog = '';
+        function log(msg) {
+            consoleLog += msg + '\n';
+            document.getElementById('console-output').textContent = consoleLog;
+            console.log(msg);
+        }
+
+        log('🧪 Testing CORS from: ' + window.location.origin);
+        log('🎯 Target URL: ' + IMAGE_URL);
+        log('---');
+
+        // Test 1: Simple image load
+        log('🧪 Test 1: Simple Image Load (no crossOrigin)...');
+        const img1 = document.getElementById('test1-img');
+        img1.src = IMAGE_URL;
+        img1.onload = () => {
+            log('✅ Test 1 PASSED: Image loaded successfully');
+            document.getElementById('test1-status').innerHTML = '<div class="status success">✅ Image loaded (no CORS needed)</div>';
+        };
+        img1.onerror = (e) => {
+            log('❌ Test 1 FAILED: ' + e);
+            document.getElementById('test1-status').innerHTML = '<div class="status error">❌ Failed to load image</div>';
+        };
+
+        // Test 2: Image with crossOrigin (CRITICAL TEST)
+        setTimeout(() => {
+            log('🧪 Test 2: Image with crossOrigin="anonymous"...');
+            const img2 = document.getElementById('test2-img');
+            img2.crossOrigin = 'anonymous';
+            img2.src = IMAGE_URL;
+
+            img2.onload = () => {
+                log('✅✅✅ Test 2 PASSED: CORS IS WORKING! ✅✅✅');
+                log('Timeline should work now!');
+                document.getElementById('test2-status').innerHTML = '<div class="status success">✅ CORS WORKS! Image loaded with crossOrigin</div>';
+            };
+
+            img2.onerror = (e) => {
+                log('❌ Test 2 FAILED: CORS headers missing');
+                log('R2 is not sending Access-Control-Allow-Origin header');
+                document.getElementById('test2-status').innerHTML = '<div class="status error">❌ CORS BLOCKED! R2 not sending CORS headers</div>';
+            };
+        }, 1000);
+
+        // Test 3: Fetch API
+        setTimeout(() => {
+            log('🧪 Test 3: Fetch API...');
+            fetch(IMAGE_URL, { mode: 'cors' })
+                .then(response => {
+                    log('✅ Test 3 PASSED: Fetch succeeded, status: ' + response.status);
+                    document.getElementById('test3-status').innerHTML = '<div class="status success">✅ Fetch API works</div>';
+                })
+                .catch(error => {
+                    log('❌ Test 3 FAILED: ' + error.message);
+                    document.getElementById('test3-status').innerHTML = '<div class="status error">❌ Fetch failed: ' + error.message + '</div>';
+                });
+        }, 2000);
+    </script>
+</body>
+
+</html>

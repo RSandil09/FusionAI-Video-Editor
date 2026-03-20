@@ -1,0 +1,124 @@
+---
+description: Fusion Video Editor codebase architecture and patterns
+alwaysApply: true
+---
+
+# Fusion Video Editor - Codebase Architecture
+
+## Tech Stack
+
+- **Framework**: Next.js 15 with App Router
+- **UI**: React 19, TailwindCSS 4, Radix UI components, shadcn/ui
+- **State**: Zustand stores, @designcombo/state for timeline state
+- **Video**: Remotion 4.0.315 for rendering/playback, @designcombo/timeline for timeline UI
+- **Auth**: Firebase Authentication (client + admin SDK)
+- **Database**: Supabase (PostgreSQL) with service_role client for writes
+- **Storage**: Cloudflare R2 (S3-compatible)
+- **Package Manager**: pnpm 10.15
+
+## Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── api/               # API routes (render, uploads, projects, auth)
+│   ├── dashboard/         # Dashboard page
+│   ├── editor/[projectId] # Dynamic editor route
+│   ├── login/signup/      # Auth pages
+├── features/editor/       # Main editor feature
+│   ├── editor.tsx         # Root editor component
+│   ├── player/           # Remotion player + sequence items
+│   ├── timeline/         # Timeline component
+│   ├── scene/            # Canvas/preview area
+│   ├── menu-item/        # Left sidebar menu panels
+│   ├── control-item/     # Right sidebar property panels
+│   ├── store/            # Zustand stores (use-store, use-layout-store, etc.)
+│   ├── hooks/            # Editor-specific hooks
+│   └── utils/            # Editor utilities
+├── components/           # Shared UI components
+├── lib/                  # Core utilities
+│   ├── auth/             # Firebase auth (client.ts, server.ts, actions.ts)
+│   ├── db/               # Supabase operations (projects.ts, assets.ts, renders.ts)
+│   ├── r2-client.ts      # R2 storage client
+│   └── remotion-renderer.ts # Server-side Remotion rendering
+└── remotion/             # Remotion composition for export
+```
+
+## Key Patterns
+
+### State Management
+
+1. **Timeline State**: Managed by `@designcombo/state` StateManager, synced to Zustand via `useStateManagerEvents` hook
+2. **Layout State**: `useLayoutStore` for UI state (active menus, drawers)
+3. **Download State**: `useDownloadState` for export progress/status
+
+### Authentication Flow
+
+1. Firebase client auth (login/signup/Google OAuth)
+2. Session cookies created via `/api/auth/session`
+3. API routes use `getUserFromRequest()` which checks both Bearer token AND session cookie
+4. Database writes use `supabaseAdmin` (service_role) to bypass RLS
+
+### Project Save/Load
+
+1. Editor state serialized via `stateManager.toJSON()`
+2. Auto-save: 3-second debounce after state changes
+3. State stored in `projects.editor_state` (JSONB)
+4. Load: `validateEditorState()` + merge with defaults
+
+### Video Rendering
+
+1. Client calls `POST /api/render` with project state
+2. Server creates render record, starts background job
+3. Remotion bundles + renders to temp file
+4. Upload to R2, update render status
+5. Client polls `GET /api/render/[id]` for progress
+
+### File Uploads
+
+1. Client: `uploadFile()` via `/api/uploads` (FormData)
+2. Server: R2 upload + asset record in Supabase
+3. Assets linked to user, optionally to project
+
+## Database Schema (Supabase)
+
+- **users**: Firebase UID as primary key
+- **projects**: editor_state (JSONB), resolution, frame_rate
+- **assets**: file_url, storage_key, user_id
+- **renders**: status, progress, output_url, error info
+
+## Environment Variables
+
+```
+# Firebase (client)
+NEXT_PUBLIC_FIREBASE_API_KEY, AUTH_DOMAIN, PROJECT_ID, etc.
+
+# Firebase Admin
+FIREBASE_ADMIN_PROJECT_ID, PRIVATE_KEY, CLIENT_EMAIL
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL, ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+
+# R2 Storage
+R2_ACCESS_KEY_ID, SECRET_ACCESS_KEY, ENDPOINT, BUCKET_NAME, PUBLIC_URL
+```
+
+## Common Tasks
+
+### Adding a new menu item
+1. Add config to `MENU_ITEMS` in `menu-list.tsx`
+2. Create component in `menu-item/` folder
+3. Add case in `MenuItem` switch
+
+### Adding timeline item type
+1. Create item component in `player/items/`
+2. Register in `SequenceItem` map
+3. Add to `CanvasTimeline.registerItems()`
+
+### API route pattern
+```typescript
+const user = await getUserFromRequest();
+if (!user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+// Use supabaseAdmin for writes (bypasses RLS)
+```
