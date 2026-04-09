@@ -169,11 +169,29 @@ const Composition = () => {
 			id: id,
 			textTransform,
 		});
+
+		// Extract text from the contentEditable element (same logic as ENTER_EDIT_MODE handler)
+		const textElement = document.querySelector(
+			`[data-text-id="${id}"]`,
+		) as HTMLDivElement;
+		let text = "";
+		if (textElement) {
+			for (let i = 0; i < textElement.childNodes.length; i++) {
+				const node = textElement.childNodes[i];
+				if (node.nodeType === Node.TEXT_NODE) {
+					text += node.textContent || "";
+				} else if (node.nodeType === Node.ELEMENT_NODE) {
+					text += (i === 0 ? "" : "\n") + (node.textContent || "");
+				}
+			}
+		}
+
 		dispatch(EDIT_OBJECT, {
 			payload: {
 				[id]: {
 					details: {
 						height: newHeight,
+						...(text ? { text } : {}),
 					},
 				},
 			},

@@ -12,6 +12,7 @@ import { ICompactFont, IFont } from "../interfaces/editor";
 import { DEFAULT_FONT } from "../constants/font";
 import { PresetText } from "./common/preset-text";
 import { Animations } from "./common/animations";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ITextControlProps {
 	color: string;
@@ -75,6 +76,27 @@ const BasicText = ({
 		name: "Regular",
 	});
 	const { compactFonts, fonts } = useDataState();
+
+	// Text content — syncs from store whenever the player saves the text on blur/exit
+	const [textContent, setTextContent] = useState<string>(
+		(trackItem.details as any).text || "",
+	);
+
+	useEffect(() => {
+		setTextContent((trackItem.details as any).text || "");
+	}, [(trackItem.details as any).text]);
+
+	const handleTextContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+		const v = e.target.value;
+		setTextContent(v);
+		dispatch(EDIT_OBJECT, {
+			payload: {
+				[trackItem.id]: {
+					details: { text: v },
+				},
+			},
+		});
+	};
 
 	useEffect(() => {
 		const fontFamily =
@@ -336,6 +358,20 @@ const BasicText = ({
 	};
 
 	const components = [
+		{
+			key: "textContent",
+			component: (
+				<div className="flex flex-col gap-1.5">
+					<label className="text-xs text-muted-foreground font-medium">Text</label>
+					<Textarea
+						value={textContent}
+						onChange={handleTextContentChange}
+						className="text-xs min-h-[72px] resize-none"
+						placeholder="Enter text…"
+					/>
+				</div>
+			),
+		},
 		{
 			key: "textPreset",
 			component: <PresetText trackItem={trackItem} properties={properties} />,
