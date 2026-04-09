@@ -6,7 +6,7 @@ import { LogoIcons } from "@/components/shared/logos";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { NewProjectModal } from "@/components/dashboard/new-project-modal";
+import NewProjectModal from "@/components/dashboard/new-project-modal";
 
 export function DashboardNavbar() {
 	const [showNewProject, setShowNewProject] = useState(false);

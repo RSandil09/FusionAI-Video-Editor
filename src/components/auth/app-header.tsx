@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Bell, LayoutGrid, FolderOpen, FileImage } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { NewProjectModal } from "@/components/dashboard/new-project-modal";
+import NewProjectModal from "@/components/dashboard/new-project-modal";
 
 const NAV_LINKS = [
 	{ href: "/dashboard", label: "Dashboard", icon: LayoutGrid },

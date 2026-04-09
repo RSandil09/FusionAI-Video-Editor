@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DashboardNavbar } from "@/components/dashboard/dashboard-navbar";
-import { NewProjectModal } from "@/components/dashboard/new-project-modal";
+import NewProjectModal from "@/components/dashboard/new-project-modal";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { AssetCard } from "@/components/dashboard/asset-card";
 import { StatsCard } from "@/components/dashboard/stats-card";

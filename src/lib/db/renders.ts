@@ -39,8 +39,8 @@ export async function createRender(data: RenderInsert): Promise<Render | null> {
 			return null;
 		}
 
-		console.log("✅ Render job created:", render.id);
-		return render;
+		console.log("✅ Render job created:", render?.id);
+		return render ?? null;
 	} catch (error) {
 		console.error("💥 Failed to create render:", error);
 		return null;

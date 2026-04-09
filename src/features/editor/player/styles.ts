@@ -93,7 +93,6 @@ export const calculateContainerStyles = (
 			type === "text" || type === "caption"
 				? "max-content"
 				: crop.height || details.height || "max-content",
-		transform: details.transform || "none",
 		opacity: details.opacity !== undefined ? details.opacity / 100 : 1,
 		transformOrigin: details.transformOrigin || "center center",
 		filter: buildFilter(details),

@@ -1,544 +1,539 @@
 "use client";
 
-/**
- * New Project Modal
- * Comprehensive project creation: Blank or from Template, with aspect ratio, duration, FPS
- */
-
-import React, { useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Loader2, FileVideo, Sparkles, ChevronRight } from "lucide-react";
-import { useAuth } from "../auth/auth-provider";
-import { createProject } from "@/lib/db/projects";
-import { createEmptyEditorState } from "@/features/editor/utils/empty-state";
-import {
-	TEMPLATES,
-	TEMPLATE_CATEGORIES,
-	type TemplateDefinition,
-} from "@/features/editor/data/templates-data";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { getIdToken } from "@/lib/auth/client";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Orientation = "portrait" | "landscape";
+
+interface UploadedAsset {
+  /** Local preview URL (object URL) */
+  preview: string;
+  /** R2 public URL returned by /api/uploads */
+  url: string;
+  type: "video" | "image" | "audio";
+  name: string;
+  durationMs?: number;
+  width?: number;
+  height?: number;
+  /** upload state */
+  status: "uploading" | "done" | "error";
+  progress: number; // 0-100
+  error?: string;
+}
 
 interface NewProjectModalProps {
-	isOpen: boolean;
-	onClose: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-// ─── Aspect Ratio Presets ────────────────────────────────────────────────────
-interface AspectRatioPreset {
-	id: string;
-	label: string;
-	ratio: string;
-	description: string;
-	width: number;
-	height: number;
-	previewW: number;
-	previewH: number;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function mimeToAssetType(mime: string): "video" | "image" | "audio" | null {
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("audio/")) return "audio";
+  return null;
 }
 
-const ASPECT_RATIOS: AspectRatioPreset[] = [
-	{
-		id: "portrait",
-		label: "Mobile",
-		ratio: "9:16",
-		description: "TikTok · Reels · Shorts",
-		width: 1080,
-		height: 1920,
-		previewW: 27,
-		previewH: 48,
-	},
-	{
-		id: "landscape",
-		label: "Landscape",
-		ratio: "16:9",
-		description: "YouTube · Desktop",
-		width: 1920,
-		height: 1080,
-		previewW: 48,
-		previewH: 27,
-	},
-	{
-		id: "square",
-		label: "Square",
-		ratio: "1:1",
-		description: "Instagram feed",
-		width: 1080,
-		height: 1080,
-		previewW: 40,
-		previewH: 40,
-	},
-	{
-		id: "instagram",
-		label: "Instagram",
-		ratio: "4:5",
-		description: "IG portrait posts",
-		width: 1080,
-		height: 1350,
-		previewW: 32,
-		previewH: 40,
-	},
+/** Read natural dimensions from a video or image file */
+function readMediaMeta(
+  file: File,
+  type: "video" | "image" | "audio",
+): Promise<{ width?: number; height?: number; durationMs?: number }> {
+  return new Promise((resolve) => {
+    if (type === "image") {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve({}); };
+      img.src = url;
+    } else if (type === "video" || type === "audio") {
+      const el = document.createElement(type === "video" ? "video" : "audio") as HTMLVideoElement;
+      const url = URL.createObjectURL(file);
+      el.preload = "metadata";
+      el.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve({
+          durationMs: Math.round(el.duration * 1000),
+          width: (el as HTMLVideoElement).videoWidth || undefined,
+          height: (el as HTMLVideoElement).videoHeight || undefined,
+        });
+      };
+      el.onerror = () => { URL.revokeObjectURL(url); resolve({}); };
+      el.src = url;
+    } else {
+      resolve({});
+    }
+  });
+}
+
+// ─── Loading steps shown during generation ────────────────────────────────────
+
+const LOADING_STEPS = [
+  "Analysing your content with AI…",
+  "Detecting scene cuts…",
+  "Arranging clips on the timeline…",
+  "Applying smart pacing…",
+  "Finalising your project…",
 ];
 
-// ─── Duration Presets (seconds) ──────────────────────────────────────────────
-const DURATIONS = [
-	{ label: "15s", value: 15 },
-	{ label: "30s", value: 30 },
-	{ label: "60s", value: 60 },
-	{ label: "90s", value: 90 },
-	{ label: "2 min", value: 120 },
-	{ label: "5 min", value: 300 },
-	{ label: "Custom", value: 0 },
-];
+// ─── Component ────────────────────────────────────────────────────────────────
 
-type StartMode = "blank" | "template";
+export default function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
+  const router = useRouter();
 
-function buildEditorStateFromTemplate(
-	template: TemplateDefinition,
-	width: number,
-	height: number,
-	fps: number,
-) {
-	const base = createEmptyEditorState({ width, height, fps });
-	const partial = template.state();
-	const trackItemIds = partial.tracks.flatMap((t) => t.items);
-	const tracks = partial.tracks.map((t) => ({
-		...t,
-		name: t.type === "text" ? "Text Track" : "Main Track",
-		accepts: [
-			"video",
-			"image",
-			"audio",
-			"text",
-			"caption",
-			"template",
-			"composition",
-		],
-		magnetic: false,
-		static: false,
-	}));
-	return {
-		...base,
-		duration: partial.duration,
-		tracks,
-		trackItemsMap: partial.trackItemsMap,
-		trackItemIds,
-		transitionsMap: {},
-	};
-}
+  // Step: 1 = upload, 2 = settings, 3 = generating
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
-export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
-	const router = useRouter();
-	const { user } = useAuth();
-	const [loading, setLoading] = useState(false);
+  // Step 1
+  const [projectName, setProjectName] = useState("");
+  const [assets, setAssets] = useState<UploadedAsset[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-	const [name, setName] = useState("");
-	const [startMode, setStartMode] = useState<StartMode>("blank");
-	const [selectedTemplate, setSelectedTemplate] =
-		useState<TemplateDefinition | null>(null);
-	const [templateCategory, setTemplateCategory] = useState("All");
-	const [selectedRatio, setSelectedRatio] = useState<string>("portrait");
-	const [frameRate, setFrameRate] = useState<30 | 60>(30);
-	const [durationPreset, setDurationPreset] = useState<number>(30);
+  // Step 2
+  const [orientation, setOrientation] = useState<Orientation>("portrait");
 
-	const activeRatio = ASPECT_RATIOS.find((r) => r.id === selectedRatio)!;
-	const filteredTemplates =
-		templateCategory === "All"
-			? TEMPLATES
-			: TEMPLATES.filter((t) => t.category === templateCategory);
+  // Step 3
+  const [loadingStep, setLoadingStep] = useState(0);
 
-	const handleCreate = async () => {
-		if (!user) {
-			toast.error("You must be logged in to create a project");
-			return;
-		}
-		if (!name.trim()) {
-			toast.error("Please enter a project name");
-			return;
-		}
-		if (startMode === "template" && !selectedTemplate) {
-			toast.error("Please select a template");
-			return;
-		}
+  // ── Reset on close ──────────────────────────────────────────────────────────
+  const handleClose = () => {
+    if (step === 3) return; // don't allow close during generation
+    setStep(1);
+    setProjectName("");
+    setAssets([]);
+    setOrientation("portrait");
+    setLoadingStep(0);
+    onClose();
+  };
 
-		setLoading(true);
-		try {
-			const { width, height } = activeRatio;
-			const durationMs =
-				startMode === "template" && selectedTemplate
-					? selectedTemplate.state().duration
-					: durationPreset > 0
-						? durationPreset * 1000
-						: 30_000;
+  // ── File upload ─────────────────────────────────────────────────────────────
+  const uploadFile = useCallback(async (file: File) => {
+    const assetType = mimeToAssetType(file.type);
+    if (!assetType) {
+      toast.error(`Unsupported file type: ${file.type}`);
+      return;
+    }
 
-			let editorState;
-			if (startMode === "template" && selectedTemplate) {
-				editorState = buildEditorStateFromTemplate(
-					selectedTemplate,
-					width,
-					height,
-					frameRate,
-				);
-			} else {
-				editorState = createEmptyEditorState({
-					width,
-					height,
-					fps: frameRate,
-				});
-			}
+    const preview = URL.createObjectURL(file);
+    const meta = await readMediaMeta(file, assetType);
 
-			const project = await createProject({
-				user_id: user.uid,
-				name: name.trim(),
-				resolution_width: width,
-				resolution_height: height,
-				frame_rate: frameRate,
-				editor_state: editorState as any,
-			});
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const placeholder: UploadedAsset = {
+      preview,
+      url: "",
+      type: assetType,
+      name: file.name,
+      status: "uploading",
+      progress: 0,
+      ...meta,
+    };
 
-			if (project) {
-				toast.success("Project created!");
-				onClose();
-				resetForm();
-				// Small delay to let the DB write propagate before the editor tries to load it
-				await new Promise((r) => setTimeout(r, 300));
-				router.push(`/editor/${project.id}`);
-			} else {
-				toast.error("Failed to create project");
-			}
-		} catch (error) {
-			console.error("Error creating project:", error);
-			toast.error("Failed to create project");
-		} finally {
-			setLoading(false);
-		}
-	};
+    setAssets((prev) => [...prev, { ...placeholder, _id: id } as any]);
 
-	const resetForm = () => {
-		setName("");
-		setStartMode("blank");
-		setSelectedTemplate(null);
-		setTemplateCategory("All");
-		setSelectedRatio("portrait");
-		setFrameRate(30);
-		setDurationPreset(30);
-	};
+    try {
+      const token = await getIdToken();
+      const formData = new FormData();
+      formData.append("file", file);
 
-	const handleClose = () => {
-		if (!loading) {
-			onClose();
-			resetForm();
-		}
-	};
+      // Use XMLHttpRequest for upload progress
+      const result = await new Promise<{ url: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/uploads");
+        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
-	if (!isOpen) return null;
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setAssets((prev) =>
+              prev.map((a) =>
+                (a as any)._id === id ? { ...a, progress: pct } : a,
+              ),
+            );
+          }
+        };
 
-	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-			<div className="relative w-full max-w-xl max-h-[80vh] rounded-xl bg-card border border-border shadow-2xl flex flex-col mx-auto overflow-hidden">
-				{/* Header */}
-				<div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border shrink-0">
-					<div>
-						<h2 className="text-xl font-semibold text-foreground">
-							New Project
-						</h2>
-						<p className="text-xs text-muted-foreground mt-0.5">
-							Choose your canvas settings and start from blank or a template
-						</p>
-					</div>
-					<button
-						onClick={handleClose}
-						disabled={loading}
-						className="text-muted-foreground hover:text-foreground transition-colors rounded-md p-1.5 hover:bg-accent"
-					>
-						<X className="h-4 w-4" />
-					</button>
-				</div>
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            resolve({ url: data.upload?.url ?? data.url });
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(formData);
+      });
 
-				{/* Body - scrollable */}
-				<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-					<div className="px-6 py-5 space-y-6 pb-2">
-						{/* Project Name */}
-						<div className="space-y-1.5">
-							<label className="block text-sm font-medium text-foreground">
-								Project Name
-							</label>
-							<input
-								type="text"
-								value={name}
-								onChange={(e) => setName(e.target.value)}
-								onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-								placeholder="My Awesome Video"
-								className="w-full px-3 py-2.5 bg-background border border-input rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all disabled:opacity-50"
-								disabled={loading}
-								autoFocus
-							/>
-						</div>
+      setAssets((prev) =>
+        prev.map((a) =>
+          (a as any)._id === id
+            ? { ...a, url: result.url, status: "done", progress: 100 }
+            : a,
+        ),
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      setAssets((prev) =>
+        prev.map((a) =>
+          (a as any)._id === id ? { ...a, status: "error", error: msg } : a,
+        ),
+      );
+      toast.error(`Failed to upload ${file.name}: ${msg}`);
+    }
+  }, []);
 
-						{/* Start from: Blank | Template */}
-						<div className="space-y-2">
-							<label className="block text-sm font-medium text-foreground">
-								Start from
-							</label>
-							<div className="flex gap-2">
-								<button
-									onClick={() => {
-										setStartMode("blank");
-										setSelectedTemplate(null);
-									}}
-									disabled={loading}
-									className={`flex-1 flex items-center gap-3 p-4 rounded-lg border transition-all ${
-										startMode === "blank"
-											? "border-primary bg-primary/10 text-primary"
-											: "border-border bg-background hover:border-primary/40 hover:bg-accent text-muted-foreground"
-									}`}
-								>
-									<div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-										<FileVideo className="h-5 w-5" />
-									</div>
-									<div className="text-left">
-										<div className="font-semibold text-sm">Blank</div>
-										<div className="text-xs opacity-80">
-											Empty timeline, start from scratch
-										</div>
-									</div>
-								</button>
-								<button
-									onClick={() => setStartMode("template")}
-									disabled={loading}
-									className={`flex-1 flex items-center gap-3 p-4 rounded-lg border transition-all ${
-										startMode === "template"
-											? "border-primary bg-primary/10 text-primary"
-											: "border-border bg-background hover:border-primary/40 hover:bg-accent text-muted-foreground"
-									}`}
-								>
-									<div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-										<Sparkles className="h-5 w-5" />
-									</div>
-									<div className="text-left">
-										<div className="font-semibold text-sm">Template</div>
-										<div className="text-xs opacity-80">
-											Pre-made layouts you can customize
-										</div>
-									</div>
-								</button>
-							</div>
-						</div>
+  const handleFiles = useCallback(
+    (files: FileList | File[]) => {
+      Array.from(files).forEach((f) => uploadFile(f));
+    },
+    [uploadFile],
+  );
 
-						{/* Template picker (when start from template) */}
-						{startMode === "template" && (
-							<div className="space-y-2">
-								<label className="block text-sm font-medium text-foreground">
-									Choose template
-								</label>
-								<div className="flex gap-1.5 px-0.5 overflow-x-auto no-scrollbar pb-1">
-									{TEMPLATE_CATEGORIES.map((cat) => (
-										<button
-											key={cat}
-											onClick={() => setTemplateCategory(cat)}
-											className={`flex-none py-1.5 px-3 text-xs font-semibold rounded-full transition-colors ${
-												templateCategory === cat
-													? "bg-primary text-primary-foreground"
-													: "bg-muted text-muted-foreground hover:bg-muted/80"
-											}`}
-										>
-											{cat}
-										</button>
-									))}
-								</div>
-								<div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-									{filteredTemplates.map((t) => {
-										const isSelected = selectedTemplate?.id === t.id;
-										return (
-											<button
-												key={t.id}
-												onClick={() => setSelectedTemplate(t)}
-												disabled={loading}
-												className={`flex flex-col rounded-xl overflow-hidden border transition-all text-left ${
-													isSelected
-														? "border-primary ring-2 ring-primary/30"
-														: "border-border hover:border-primary/50"
-												}`}
-											>
-												<div
-													className={`h-16 bg-gradient-to-br ${t.color} flex items-center justify-center text-2xl relative`}
-												>
-													{t.emoji}
-													{isSelected && (
-														<div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-															<ChevronRight className="h-6 w-6 text-primary-foreground" />
-														</div>
-													)}
-												</div>
-												<div className="p-2 bg-card">
-													<div className="font-semibold text-xs truncate">
-														{t.name}
-													</div>
-													<Badge
-														variant="secondary"
-														className="text-[9px] mt-0.5"
-													>
-														{t.category}
-													</Badge>
-												</div>
-											</button>
-										);
-									})}
-								</div>
-							</div>
-						)}
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      handleFiles(e.dataTransfer.files);
+    },
+    [handleFiles],
+  );
 
-						{/* Aspect Ratio */}
-						<div className="space-y-2">
-							<label className="block text-sm font-medium text-foreground">
-								Canvas Format
-							</label>
-							<div className="grid grid-cols-4 gap-2">
-								{ASPECT_RATIOS.map((preset) => {
-									const isActive = selectedRatio === preset.id;
-									return (
-										<button
-											key={preset.id}
-											onClick={() => setSelectedRatio(preset.id)}
-											disabled={loading}
-											className={`flex flex-col items-center gap-2.5 p-3 rounded-lg border transition-all duration-150 ${
-												isActive
-													? "border-primary bg-primary/10 text-primary"
-													: "border-border bg-background hover:border-primary/40 hover:bg-accent text-muted-foreground"
-											}`}
-										>
-											<div className="flex items-end justify-center h-12 w-full">
-												<div
-													className={`rounded-sm border-2 transition-colors ${
-														isActive
-															? "border-primary bg-primary/20"
-															: "border-muted-foreground/40 bg-muted"
-													}`}
-													style={{
-														width: `${preset.previewW}px`,
-														height: `${preset.previewH}px`,
-													}}
-												/>
-											</div>
-											<div className="text-center">
-												<div
-													className={`text-xs font-semibold leading-tight ${
-														isActive ? "text-primary" : "text-foreground"
-													}`}
-												>
-													{preset.label}
-												</div>
-												<div className="text-[10px] text-muted-foreground mt-0.5 font-medium">
-													{preset.ratio}
-												</div>
-											</div>
-										</button>
-									);
-								})}
-							</div>
-							<p className="text-xs text-muted-foreground mt-1 pl-0.5">
-								{activeRatio.width}×{activeRatio.height}px ·{" "}
-								{activeRatio.description}
-							</p>
-						</div>
+  const removeAsset = (idx: number) => {
+    setAssets((prev) => {
+      const next = [...prev];
+      URL.revokeObjectURL(next[idx].preview);
+      next.splice(idx, 1);
+      return next;
+    });
+  };
 
-						{/* Duration + FPS (only when blank) */}
-						{startMode === "blank" && (
-							<div className="grid grid-cols-2 gap-5">
-								<div className="space-y-1.5">
-									<label className="block text-sm font-medium text-foreground">
-										Duration
-									</label>
-									<div className="grid grid-cols-3 gap-1.5">
-										{DURATIONS.map((d) => (
-											<button
-												key={d.value}
-												onClick={() => setDurationPreset(d.value)}
-												disabled={loading}
-												className={`px-2 py-2 rounded-lg border text-xs font-medium transition-all ${
-													durationPreset === d.value
-														? "bg-primary text-primary-foreground border-primary"
-														: "bg-background border-border hover:border-primary/40 text-muted-foreground hover:text-foreground"
-												}`}
-											>
-												{d.label}
-											</button>
-										))}
-									</div>
-								</div>
-								<div className="space-y-1.5">
-									<label className="block text-sm font-medium text-foreground">
-										Frame Rate
-									</label>
-									<div className="flex gap-1.5">
-										{([30, 60] as const).map((fps) => (
-											<button
-												key={fps}
-												onClick={() => setFrameRate(fps)}
-												disabled={loading}
-												className={`flex-1 px-2 py-2 rounded-lg border text-xs font-medium transition-all ${
-													frameRate === fps
-														? "bg-primary text-primary-foreground border-primary"
-														: "bg-background border-border hover:border-primary/40 text-muted-foreground hover:text-foreground"
-												}`}
-											>
-												{fps} FPS
-											</button>
-										))}
-									</div>
-								</div>
-							</div>
-						)}
+  // ── Step navigation ─────────────────────────────────────────────────────────
+  const canProceedToStep2 = projectName.trim().length > 0;
 
-						{/* FPS when template (templates have their own duration) */}
-						{startMode === "template" && (
-							<div className="space-y-1.5">
-								<label className="block text-sm font-medium text-foreground">
-									Frame Rate
-								</label>
-								<div className="flex gap-2">
-									{([30, 60] as const).map((fps) => (
-										<button
-											key={fps}
-											onClick={() => setFrameRate(fps)}
-											disabled={loading}
-											className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-												frameRate === fps
-													? "bg-primary text-primary-foreground border-primary"
-													: "bg-background border-border hover:border-primary/40 text-muted-foreground hover:text-foreground"
-											}`}
-										>
-											{fps} FPS
-										</button>
-									))}
-								</div>
-							</div>
-						)}
-					</div>
-				</div>
+  const handleGenerate = async () => {
+    setStep(3);
+    setLoadingStep(0);
 
-				{/* Footer */}
-				<div className="flex gap-3 px-6 py-4 border-t border-border shrink-0 bg-card">
-					<button
-						onClick={handleClose}
-						disabled={loading}
-						className="flex-1 px-4 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-accent transition-colors disabled:opacity-50"
-					>
-						Cancel
-					</button>
-					<button
-						onClick={handleCreate}
-						disabled={
-							loading ||
-							!name.trim() ||
-							(startMode === "template" && !selectedTemplate)
-						}
-						className="flex-1 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-					>
-						{loading && <Loader2 className="h-4 w-4 animate-spin" />}
-						{loading ? "Creating..." : "Create Project"}
-					</button>
-				</div>
-			</div>
-		</div>
-	);
+    // Cycle through loading messages while waiting
+    const interval = setInterval(() => {
+      setLoadingStep((s) => Math.min(s + 1, LOADING_STEPS.length - 1));
+    }, 3500);
+
+    try {
+      const token = await getIdToken();
+      const doneAssets = assets
+        .filter((a) => a.status === "done" && a.url)
+        .map((a) => ({
+          url: a.url,
+          type: a.type,
+          durationMs: a.durationMs,
+          width: a.width,
+          height: a.height,
+          name: a.name,
+        }));
+
+      const res = await fetch("/api/projects/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: projectName.trim(),
+          orientation,
+          fps: 30,
+          assets: doneAssets,
+        }),
+      });
+
+      clearInterval(interval);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Server error ${res.status}`);
+      }
+
+      const { projectId } = await res.json();
+      router.push(`/editor/${projectId}`);
+    } catch (err) {
+      clearInterval(interval);
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      toast.error(`Failed to create project: ${msg}`);
+      setStep(2); // go back to settings so user can retry
+    }
+  };
+
+  if (!isOpen) return null;
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+
+      {/* Modal */}
+      <div className="relative z-10 w-full max-w-xl mx-4 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/10">
+          <div>
+            <h2 className="text-white text-lg font-semibold">
+              {step === 1 && "New Project"}
+              {step === 2 && "Choose Orientation"}
+              {step === 3 && "Building Your Timeline…"}
+            </h2>
+            {step !== 3 && (
+              <p className="text-white/40 text-xs mt-0.5">
+                Step {step} of 2
+              </p>
+            )}
+          </div>
+          {step !== 3 && (
+            <button
+              onClick={handleClose}
+              className="text-white/40 hover:text-white transition-colors text-xl leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {/* ── Step 1: Name + Upload ───────────────────────────────────────── */}
+        {step === 1 && (
+          <div className="px-6 py-5 space-y-5">
+            {/* Project name */}
+            <div>
+              <label className="block text-white/70 text-xs font-medium mb-1.5">
+                Project name
+              </label>
+              <input
+                type="text"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="My awesome vlog"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-white/25 focus:outline-none focus:border-white/30 transition-colors"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canProceedToStep2) setStep(2);
+                }}
+              />
+            </div>
+
+            {/* Drop zone */}
+            <div>
+              <label className="block text-white/70 text-xs font-medium mb-1.5">
+                Upload assets{" "}
+                <span className="text-white/30 font-normal">(optional — add later in editor)</span>
+              </label>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={onDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors min-h-[120px] ${
+                  isDragging
+                    ? "border-blue-500 bg-blue-500/10"
+                    : "border-white/15 hover:border-white/30 bg-white/[0.02] hover:bg-white/[0.04]"
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="video/*,image/*,audio/*"
+                  className="hidden"
+                  onChange={(e) => e.target.files && handleFiles(e.target.files)}
+                />
+                <span className="text-2xl">📁</span>
+                <p className="text-white/50 text-sm text-center px-4">
+                  Drop videos, photos, or audio here
+                  <br />
+                  <span className="text-white/30 text-xs">or click to browse</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Asset list */}
+            {assets.length > 0 && (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {assets.map((asset, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 bg-white/5 rounded-lg px-3 py-2"
+                  >
+                    {/* Thumbnail / icon */}
+                    <div className="w-10 h-10 rounded-md overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center">
+                      {asset.type === "image" ? (
+                        <img
+                          src={asset.preview}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-lg">
+                          {asset.type === "video" ? "🎬" : "🎵"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white/80 text-xs truncate">{asset.name}</p>
+                      {asset.status === "uploading" && (
+                        <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 transition-all"
+                            style={{ width: `${asset.progress}%` }}
+                          />
+                        </div>
+                      )}
+                      {asset.status === "done" && (
+                        <p className="text-green-400 text-xs mt-0.5">Uploaded ✓</p>
+                      )}
+                      {asset.status === "error" && (
+                        <p className="text-red-400 text-xs mt-0.5 truncate">
+                          {asset.error}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Remove */}
+                    {asset.status !== "uploading" && (
+                      <button
+                        onClick={() => removeAsset(idx)}
+                        className="text-white/30 hover:text-white/70 text-lg leading-none flex-shrink-0"
+                        aria-label="Remove"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Next */}
+            <div className="flex justify-end pt-1">
+              <button
+                disabled={!canProceedToStep2}
+                onClick={() => setStep(2)}
+                className="px-5 py-2.5 rounded-lg bg-white text-black text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/90 transition-colors"
+              >
+                Continue →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: Orientation ─────────────────────────────────────────── */}
+        {step === 2 && (
+          <div className="px-6 py-5 space-y-5">
+            <p className="text-white/50 text-sm">
+              Choose the format for your project. You can't change this later.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              {(
+                [
+                  {
+                    value: "portrait",
+                    label: "Portrait",
+                    sub: "9:16 · 1080×1920",
+                    icon: (
+                      <div className="w-8 h-12 rounded-md border-2 border-current" />
+                    ),
+                  },
+                  {
+                    value: "landscape",
+                    label: "Landscape",
+                    sub: "16:9 · 1920×1080",
+                    icon: (
+                      <div className="w-12 h-8 rounded-md border-2 border-current" />
+                    ),
+                  },
+                ] as const
+              ).map(({ value, label, sub, icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setOrientation(value)}
+                  className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
+                    orientation === value
+                      ? "border-white bg-white/10 text-white"
+                      : "border-white/15 bg-white/[0.02] text-white/40 hover:border-white/30 hover:text-white/60"
+                  }`}
+                >
+                  {icon}
+                  <div className="text-center">
+                    <p className="text-sm font-medium">{label}</p>
+                    <p className="text-xs opacity-60 mt-0.5">{sub}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center pt-1">
+              <button
+                onClick={() => setStep(1)}
+                className="px-4 py-2.5 rounded-lg text-white/50 text-sm hover:text-white transition-colors"
+              >
+                ← Back
+              </button>
+              <button
+                onClick={handleGenerate}
+                className="px-5 py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
+              >
+                <span>✨</span>
+                Create project
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3: Generating ──────────────────────────────────────────── */}
+        {step === 3 && (
+          <div className="px-6 py-10 flex flex-col items-center gap-6">
+            {/* Spinner */}
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-white/10" />
+              <div className="absolute inset-0 rounded-full border-4 border-t-white animate-spin" />
+            </div>
+
+            {/* Current step text */}
+            <div className="text-center space-y-1">
+              <p className="text-white text-sm font-medium">
+                {LOADING_STEPS[loadingStep]}
+              </p>
+              <p className="text-white/40 text-xs">
+                This may take up to 30 seconds for longer videos
+              </p>
+            </div>
+
+            {/* Step dots */}
+            <div className="flex gap-1.5">
+              {LOADING_STEPS.map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${
+                    i <= loadingStep ? "bg-white" : "bg-white/20"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
