@@ -38,7 +38,7 @@ export async function upsertUser(data: UserInsert): Promise<User | null> {
 				},
 			)
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error upserting user:", error.message || error);
@@ -46,8 +46,8 @@ export async function upsertUser(data: UserInsert): Promise<User | null> {
 			return null;
 		}
 
-		console.log("✅ User synced to database:", user.email);
-		return user;
+		console.log("✅ User synced to database:", user?.email);
+		return user ?? null;
 	} catch (error) {
 		console.error("Failed to upsert user:", error);
 		console.warn("💡 Check if Supabase tables exist (run schema.sql)");
@@ -64,7 +64,7 @@ export async function getUser(userId: string): Promise<User | null> {
 			.from("users")
 			.select("*")
 			.eq("id", userId)
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error fetching user:", error);
@@ -91,7 +91,7 @@ export async function updateUser(
 			.update(updates)
 			.eq("id", userId)
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error updating user:", error);

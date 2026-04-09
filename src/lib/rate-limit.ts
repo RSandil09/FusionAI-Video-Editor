@@ -1,6 +1,13 @@
 /**
  * In-memory rate limiter for API routes.
- * Use for single-instance deployments. For serverless/multi-instance, use Upstash Redis.
+ *
+ * ⚠️  SERVERLESS LIMITATION: On Vercel / serverless platforms each request may
+ * land on a different cold instance, so this Map is NOT shared across instances.
+ * Rate limiting is best-effort and will not prevent a determined attacker from
+ * cycling instances.
+ *
+ * For production-grade rate limiting replace this with Upstash Redis:
+ *   https://upstash.com/docs/redis/sdks/ratelimit-ts/overview
  */
 
 type Entry = { count: number; resetAt: number };

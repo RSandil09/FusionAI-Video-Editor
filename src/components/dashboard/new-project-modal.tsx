@@ -197,9 +197,11 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
 
 			if (project) {
 				toast.success("Project created!");
-				router.push(`/editor/${project.id}`);
 				onClose();
 				resetForm();
+				// Small delay to let the DB write propagate before the editor tries to load it
+				await new Promise((r) => setTimeout(r, 300));
+				router.push(`/editor/${project.id}`);
 			} else {
 				toast.error("Failed to create project");
 			}

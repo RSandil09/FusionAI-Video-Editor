@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
 			headers: {
 				Authorization: apiKey,
 			},
+			next: { revalidate: 3600 }, // Cache Pexels results for 1 hour
 		});
 
 		if (!response.ok) {

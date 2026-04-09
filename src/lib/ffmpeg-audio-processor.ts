@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import util from "util";
+import { uploadToR2 } from "@/lib/storage/r2";
 
 const execPromise = util.promisify(exec);
 
@@ -32,7 +33,7 @@ export interface AudioEffectsPayload {
 }
 
 /**
- * Downloads a File from a URL to a local temporary path
+ * Downloads a file from a URL to a local temporary path
  */
 async function downloadAudioToTemp(
 	url: string,
@@ -42,7 +43,7 @@ async function downloadAudioToTemp(
 	const fileName = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
 	const filePath = path.join(tempDir, fileName);
 
-	const response = await fetch(url);
+	const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
 	if (!response.ok)
 		throw new Error(`Failed to fetch audio: ${response.statusText}`);
 
@@ -52,15 +53,19 @@ async function downloadAudioToTemp(
 }
 
 /**
- * Converts the frontend AudioEffects JSON into a valid FFMPEG audio filter string
+ * Converts the frontend AudioEffects JSON into a valid FFMPEG audio filter string.
+ *
+ * Key corrections vs the old version:
+ *  - Compressor threshold: FFMPEG acompressor expects a LINEAR ratio (0–1), not dB.
+ *    Convert with: 10^(dBval/20)
+ *  - Compressor attack/release: FFMPEG expects milliseconds (same as Web Audio after *1000).
+ *  - Each band is only emitted when the effect is active AND the value is non-neutral.
  */
 function buildFfmpegAudioFilter(effects: AudioEffectsPayload): string {
 	const filters: string[] = [];
 
-	// 1. Equalizer Five (Highpass, LowShelf, Peaking, HighShelf, Lowpass)
-	// FFMPEG equalizer node: equalizer=f=freq:width_type=q:width=Q:g=gain
-	// FFMPEG highpass/lowpass: highpass=f=freq / lowpass=f=freq
-	if (effects.eq && effects.eq.active) {
+	// 1. Five-band EQ
+	if (effects.eq?.active) {
 		if (effects.eq.lowCut > 20) {
 			filters.push(`highpass=f=${effects.eq.lowCut}`);
 		}
@@ -84,49 +89,48 @@ function buildFfmpegAudioFilter(effects: AudioEffectsPayload): string {
 		}
 	}
 
-	// 2. Advanced Compressor
-	// FFMPEG acompressor: threshold=XdB:ratio=X:attack=X:release=X:makeup=XdB
-	if (effects.compressor && effects.compressor.active) {
-		const threshold = effects.compressor.threshold || -24;
-		const ratio = effects.compressor.ratio || 4;
-		const attack = effects.compressor.attack || 10;
-		const release = effects.compressor.release || 100;
-		const makeup = effects.compressor.makeup || 0;
+	// 2. Compressor
+	// FFMPEG acompressor threshold is a LINEAR amplitude ratio (0–1).
+	// Web Audio / our UI stores it in dB → convert: linear = 10^(dB/20)
+	if (effects.compressor?.active) {
+		const thresholdDb = effects.compressor.threshold ?? -24;
+		const thresholdLinear = Math.pow(10, thresholdDb / 20);
+		const ratio = effects.compressor.ratio ?? 4;
+		// FFMPEG attack/release are in milliseconds
+		const attack = effects.compressor.attack ?? 10;
+		const release = effects.compressor.release ?? 100;
+		// makeup is in dB — convert to linear for FFMPEG makeup gain
+		const makeupDb = effects.compressor.makeup ?? 0;
+		const makeupLinear = Math.pow(10, makeupDb / 20);
 
 		filters.push(
-			`acompressor=threshold=${threshold}dB:ratio=${ratio}:attack=${attack}:release=${release}:makeup=${makeup}dB`,
+			`acompressor=threshold=${thresholdLinear.toFixed(6)}:ratio=${ratio}:attack=${attack}:release=${release}:makeup=${makeupLinear.toFixed(6)}`,
 		);
 	}
 
-	// 3. Delay
-	// FFMPEG aecho: in_gain:out_gain:delays:decays
-	// If delay is 500ms, and mix is 50%, we setup a basic aecho
-	if (effects.delay && effects.delay.active) {
-		const time = Math.max(1, effects.delay.time || 0);
-		const feedback = Math.max(
-			0,
-			Math.min((effects.delay.feedback || 0) / 100, 0.95),
-		);
-		const mix = Math.max(0, Math.min((effects.delay.mix || 0) / 100, 1.0));
+	// 3. Delay (aecho: in_gain:out_gain:delays_ms:decays)
+	if (effects.delay?.active) {
+		const time = Math.max(1, effects.delay.time ?? 0);
+		const feedback = Math.max(0, Math.min((effects.delay.feedback ?? 0) / 100, 0.95));
+		const mix = Math.max(0, Math.min((effects.delay.mix ?? 0) / 100, 1.0));
 
 		if (time > 0 && mix > 0) {
-			const inGain = 1.0 - mix * 0.5; // Reduce dry slightly as wet increases
+			const inGain = Math.max(0.1, 1.0 - mix * 0.5);
 			const outGain = mix;
-			filters.push(`aecho=${inGain}:${outGain}:${time}:${feedback}`);
+			filters.push(`aecho=${inGain.toFixed(3)}:${outGain.toFixed(3)}:${time}:${feedback.toFixed(3)}`);
 		}
 	}
 
-	// 4. Reverb (Simulated with dense delay/chorus or aecho)
-	if (effects.reverb && effects.reverb.active) {
-		const mix = Math.max(0, Math.min((effects.reverb.mix || 0) / 100, 1.0));
-		const size = Math.max(1, effects.reverb.size || 50);
+	// 4. Reverb (simulated with two-tap aecho)
+	if (effects.reverb?.active) {
+		const mix = Math.max(0, Math.min((effects.reverb.mix ?? 0) / 100, 1.0));
+		const size = Math.max(1, effects.reverb.size ?? 50);
 
 		if (mix > 0) {
-			const inGain = 1.0 - mix * 0.5;
-			// Size 1-100 scales roughly 10ms to 150ms delay time ranges for multiple taps
+			const inGain = Math.max(0.1, 1.0 - mix * 0.5);
 			const tap1 = Math.round(size * 1.5);
 			const tap2 = Math.round(size * 2.2);
-			filters.push(`aecho=${inGain}:${mix}:${tap1}|${tap2}:0.4|0.3`);
+			filters.push(`aecho=${inGain.toFixed(3)}:${mix.toFixed(3)}:${tap1}|${tap2}:0.4|0.3`);
 		}
 	}
 
@@ -134,76 +138,88 @@ function buildFfmpegAudioFilter(effects: AudioEffectsPayload): string {
 }
 
 /**
- * Main export: Takes an array of track items, finds any audio tracks with
- * audioEffects, downloads them, processes through FFMPEG, and replaces the `src` with the processed file.
+ * Main export: finds audio tracks with audioEffects, processes them through FFMPEG,
+ * uploads the result to R2, and replaces the src with a public R2 URL.
+ *
+ * Using R2 (not file://) because Puppeteer cannot access the local filesystem
+ * during Remotion's headless render.
  */
 export async function processAudioEffectsForRender(
 	trackItemsMap: Record<string, any>,
-): Promise<Record<string, any>> {
+	renderId: string,
+): Promise<{ updatedMap: Record<string, any>; tempR2Keys: string[] }> {
 	const updatedMap = { ...trackItemsMap };
+	const tempR2Keys: string[] = [];
 
-	// Collect jobs
 	const processingPromises = Object.values(updatedMap)
 		.filter(
 			(item) =>
-				item.type === "audio" ||
-				(item.details?.src && item.details?.audioEffects),
+				(item.type === "audio" || item.details?.src) &&
+				item.details?.audioEffects,
 		)
 		.map(async (item) => {
-			const details = item.details || {};
+			const details = item.details ?? {};
 			const src = details.src;
 			const effects = details.audioEffects as AudioEffectsPayload;
 
-			// Skip if no src or no actual effects applied
-			if (!src || !effects || Object.keys(effects).length === 0) return;
+			if (!src || !effects || !effects.active) return;
+
+			// Check if any effect band is actually active
+			const anyActive =
+				effects.eq?.active ||
+				effects.compressor?.active ||
+				effects.delay?.active ||
+				effects.reverb?.active;
+			if (!anyActive) return;
 
 			try {
-				console.log(`[AudioFX] Processing item ${item.id} with effects...`);
+				console.log(`[AudioFX] Processing item ${item.id}...`);
 
-				// 1. Download original audio
 				const originalFilePath = await downloadAudioToTemp(
 					src,
 					`original_audio_${item.id}`,
 				);
 
-				// 2. Build filter graph
 				const filterStr = buildFfmpegAudioFilter(effects);
-
 				if (!filterStr) {
-					console.log(
-						`[AudioFX] Filter string empty for ${item.id}, skipping FFMPEG.`,
-					);
-					return; // Pass through original if all effects are 0
+					fs.unlinkSync(originalFilePath);
+					return;
 				}
 
-				// 3. Run FFMPEG
-				const tempDir = os.tmpdir();
-				const outputFileName = `processed_audio_${item.id}_${Date.now()}.mp3`;
-				const outputFilePath = path.join(tempDir, outputFileName);
+				const outputFilePath = path.join(
+					os.tmpdir(),
+					`processed_audio_${item.id}_${Date.now()}.mp3`,
+				);
 
-				// -y overwrites without asking
 				const command = `ffmpeg -y -i "${originalFilePath}" -af "${filterStr}" "${outputFilePath}"`;
-				console.log(`[AudioFX] Executing: ${command}`);
-
+				console.log(`[AudioFX] Running: ${command}`);
 				await execPromise(command);
 
-				// 4. Replace `src` in the composition map with the local pre-processed file
-				// To serve local files during `bundle()`, use absolute path or file:// URI
-				updatedMap[item.id].details.src = `file://${outputFilePath}`;
+				// Upload processed file to R2 so Puppeteer can fetch it by HTTPS URL
+				const r2Key = `temp-audio/${renderId}/${item.id}.mp3`;
+				const audioBuffer = fs.readFileSync(outputFilePath);
+				const publicUrl = await uploadToR2(r2Key, audioBuffer, "audio/mpeg");
 
-				console.log(
-					`[AudioFX] Success! Replaced ${item.id} src with processed file.`,
-				);
+				tempR2Keys.push(r2Key);
+				updatedMap[item.id] = {
+					...updatedMap[item.id],
+					details: { ...updatedMap[item.id].details, src: publicUrl },
+				};
+
+				console.log(`[AudioFX] Replaced ${item.id} src → ${publicUrl}`);
+
+				// Clean up local temp files
+				fs.unlinkSync(originalFilePath);
+				fs.unlinkSync(outputFilePath);
 			} catch (error) {
 				console.error(
 					`[AudioFX] Failed to process audio for item ${item.id}:`,
 					error,
 				);
-				// Fallback to the original src if FFMPEG fails, so the render doesn't crash completely
+				// Keep original src so render doesn't crash
 			}
 		});
 
 	await Promise.all(processingPromises);
-
-	return updatedMap;
+	return { updatedMap, tempR2Keys };
 }

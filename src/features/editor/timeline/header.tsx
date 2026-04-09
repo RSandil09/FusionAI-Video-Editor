@@ -4,12 +4,13 @@ import {
 	ACTIVE_SPLIT,
 	LAYER_CLONE,
 	LAYER_DELETE,
+	LAYER_SELECT,
 	TIMELINE_SCALE_CHANGED,
 } from "@designcombo/state";
 import { PLAYER_PAUSE, PLAYER_PLAY } from "../constants/events";
-import { frameToTimeString, getCurrentTime, timeToString } from "../utils/time";
+import { frameToTimeString, getSafeCurrentFrame, timeToString } from "../utils/time";
 import useStore from "../store/use-store";
-import { SquareSplitHorizontal, Trash, ZoomIn, ZoomOut } from "lucide-react";
+import { Copy, Hand, MapPin, MousePointer2, Scissors, SquareSplitHorizontal, Trash, ZoomIn, ZoomOut } from "lucide-react";
 import {
 	getFitZoomLevel,
 	getNextZoomLevel,
@@ -23,6 +24,8 @@ import useUpdateAnsestors from "../hooks/use-update-ansestors";
 import { ITimelineScaleState } from "@designcombo/types";
 import { useIsLargeScreen } from "@/hooks/use-media-query";
 import { useTimelineOffsetX } from "../hooks/use-timeline-offset";
+import type { ToolMode } from "./engine/types";
+import { cn } from "@/lib/utils";
 
 const IconPlayerPlayFilled = ({ size }: { size: number }) => (
 	<svg
@@ -81,24 +84,66 @@ const IconPlayerSkipForward = ({ size }: { size: number }) => (
 		<path d="M20 5l0 14" />
 	</svg>
 );
+const TOOL_BUTTONS: { mode: ToolMode; icon: React.ReactNode; title: string; key: string }[] = [
+	{ mode: "select", icon: <MousePointer2 size={13} />, title: "Select (V)", key: "V" },
+	{ mode: "razor",  icon: <Scissors size={13} />,      title: "Razor (B)",  key: "B" },
+	{ mode: "hand",   icon: <Hand size={13} />,           title: "Pan (H)",    key: "H" },
+	{ mode: "marker", icon: <MapPin size={13} />,         title: "Marker (M)", key: "M" },
+];
+
 const Header = () => {
 	const [playing, setPlaying] = useState(false);
+	const [toolMode, setToolModeState] = useState<ToolMode>("select");
 	const { duration, fps, scale, playerRef, activeIds, timeline } = useStore();
+
+	const handleToolMode = (mode: ToolMode) => {
+		setToolModeState(mode);
+		(timeline as any)?.setToolMode?.(mode);
+	};
+
+	// Keyboard shortcuts for tool modes
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+			const tool = TOOL_BUTTONS.find((t) => t.key === e.key.toUpperCase());
+			if (tool) handleToolMode(tool.mode);
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [timeline]);
+
+	const handleSkipBack = () => {
+		playerRef?.current?.seekTo(0);
+	};
+
+	const handleSkipForward = () => {
+		if (playerRef?.current) {
+			playerRef.current.seekTo(Math.round((duration / 1000) * fps));
+		}
+	};
 	const isLargeScreen = useIsLargeScreen();
 	useUpdateAnsestors({ playing, playerRef });
 
 	const currentFrame = useCurrentPlayerFrame(playerRef);
 
 	const doActiveDelete = () => {
-		dispatch(LAYER_DELETE);
+		// Pass trackItemIds explicitly — StateManager's delete handler uses
+		// payload.trackItemIds when present, otherwise falls back to its internal
+		// activeIds which may be stale. Passing them directly is always reliable.
+		dispatch(LAYER_DELETE, { payload: { trackItemIds: activeIds } });
 	};
 
 	const doActiveSplit = () => {
-		dispatch(ACTIVE_SPLIT, {
-			payload: {},
-			options: {
-				time: getCurrentTime(),
-			},
+		if (activeIds.length === 1) {
+			dispatch(LAYER_SELECT, { payload: { trackItemIds: activeIds } });
+		}
+		// Capture time now, but let StateManager process the selection first
+		const timeMs = (getSafeCurrentFrame(playerRef) / fps) * 1000;
+		requestAnimationFrame(() => {
+			dispatch(ACTIVE_SPLIT, {
+				payload: {},
+				options: { time: timeMs },
+			});
 		});
 	};
 
@@ -128,19 +173,15 @@ const Header = () => {
 	};
 
 	useEffect(() => {
-		playerRef?.current?.addEventListener("play", () => {
-			setPlaying(true);
-		});
-		playerRef?.current?.addEventListener("pause", () => {
-			setPlaying(false);
-		});
+		const player = playerRef?.current;
+		if (!player) return;
+		const onPlay = () => setPlaying(true);
+		const onPause = () => setPlaying(false);
+		player.addEventListener("play", onPlay);
+		player.addEventListener("pause", onPause);
 		return () => {
-			playerRef?.current?.removeEventListener("play", () => {
-				setPlaying(true);
-			});
-			playerRef?.current?.removeEventListener("pause", () => {
-				setPlaying(false);
-			});
+			player.removeEventListener("play", onPlay);
+			player.removeEventListener("pause", onPause);
 		};
 	}, [playerRef]);
 
@@ -172,46 +213,68 @@ const Header = () => {
 						alignItems: "center",
 					}}
 				>
-					<div className="flex px-2 gap-0.5">
+					<div className="flex px-2 gap-0.5 items-center">
+						{/* Tool mode switcher */}
+						<div className="flex gap-0.5">
+							{TOOL_BUTTONS.map((t) => (
+								<Button
+									key={t.mode}
+									title={t.title}
+									onClick={() => handleToolMode(t.mode)}
+									variant="ghost"
+									size="icon"
+									className={cn(
+										"h-7 w-7 rounded",
+										toolMode === t.mode
+											? "bg-primary/20 text-primary border border-primary/40"
+											: "hover:bg-muted/60",
+									)}
+								>
+									{t.icon}
+								</Button>
+							))}
+						</div>
+
+						{/* Divider */}
+						<div className="w-px h-5 bg-border/50 mx-1" />
+
+						{/* Edit actions — icon only, compact */}
 						<Button
 							disabled={!activeIds.length}
 							onClick={doActiveDelete}
-							variant={"ghost"}
-							size={isLargeScreen ? "sm" : "icon"}
-							className="flex items-center gap-1 px-2 rounded-lg hover:bg-muted/60"
+							variant="ghost"
+							size="icon"
+							title="Delete (Del)"
+							className="h-7 w-7 rounded hover:bg-destructive/20 hover:text-destructive disabled:opacity-30"
 						>
-							<Trash size={14} />{" "}
-							<span className="hidden lg:block">Delete</span>
+							<Trash size={13} />
 						</Button>
-
 						<Button
 							disabled={!activeIds.length}
 							onClick={doActiveSplit}
-							variant={"ghost"}
-							size={isLargeScreen ? "sm" : "icon"}
-							className="flex items-center gap-1 px-2 rounded-lg hover:bg-muted/60"
+							variant="ghost"
+							size="icon"
+							title="Split at playhead"
+							className="h-7 w-7 rounded hover:bg-muted/60 disabled:opacity-30"
 						>
-							<SquareSplitHorizontal size={15} />{" "}
-							<span className="hidden lg:block">Split</span>
+							<SquareSplitHorizontal size={13} />
 						</Button>
 						<Button
 							disabled={!activeIds.length}
-							onClick={() => {
-								dispatch(LAYER_CLONE);
-							}}
-							variant={"ghost"}
-							size={isLargeScreen ? "sm" : "icon"}
-							className="flex items-center gap-1 px-2 rounded-lg hover:bg-muted/60"
+							onClick={() => dispatch(LAYER_CLONE)}
+							variant="ghost"
+							size="icon"
+							title="Clone"
+							className="h-7 w-7 rounded hover:bg-muted/60 disabled:opacity-30"
 						>
-							<SquareSplitHorizontal size={15} />{" "}
-							<span className="hidden lg:block">Clone</span>
+							<Copy size={13} />
 						</Button>
 					</div>
 					<div className="flex items-center justify-center">
 						<div>
 							<Button
 								className="hidden lg:inline-flex"
-								onClick={doActiveDelete}
+								onClick={handleSkipBack}
 								variant={"ghost"}
 								size={"icon"}
 							>
@@ -235,7 +298,7 @@ const Header = () => {
 							</Button>
 							<Button
 								className="hidden lg:inline-flex"
-								onClick={doActiveSplit}
+								onClick={handleSkipForward}
 								variant={"ghost"}
 								size={"icon"}
 							>

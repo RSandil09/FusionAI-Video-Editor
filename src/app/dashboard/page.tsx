@@ -85,7 +85,8 @@ function DashboardContent() {
 	};
 
 	const handleDeleteProject = async (projectId: string) => {
-		const success = await deleteProject(projectId);
+		if (!user) return;
+		const success = await deleteProject(projectId, user.uid);
 		if (success) {
 			toast.success("Project deleted");
 			loadData(); // Reload

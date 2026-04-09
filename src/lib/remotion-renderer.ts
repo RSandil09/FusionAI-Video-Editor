@@ -1,7 +1,7 @@
 import { bundle } from "@remotion/bundler/dist/bundle";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import { getR2Client } from "@/lib/r2-client";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { updateRenderStatus } from "@/lib/db/renders";
 import path from "path";
 import fs from "fs";
@@ -14,9 +14,24 @@ export interface RenderConfig {
 	width: number;
 	height: number;
 	durationInFrames: number;
+	/** R2 keys for temp processed-audio files — deleted after render finishes or fails */
+	tempR2Keys?: string[];
 }
 
 const LOG_FILE = path.join(process.cwd(), "render.log");
+
+async function deleteTempAudio(keys: string[]): Promise<void> {
+	if (!keys.length) return;
+	const bucketName = process.env.R2_BUCKET_NAME;
+	if (!bucketName) return;
+	const client = getR2Client();
+	await Promise.allSettled(
+		keys.map((key) =>
+			client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key })),
+		),
+	);
+	console.log(`[render] Deleted ${keys.length} temp audio file(s) from R2`);
+}
 
 function logToFile(message: string) {
 	const timestamp = new Date().toISOString();
@@ -36,6 +51,7 @@ export async function renderVideo(
 	renderId: string,
 	config: RenderConfig,
 ): Promise<string> {
+	const { tempR2Keys = [] } = config;
 	console.log(`[${renderId}] renderVideo called. CWD: ${process.cwd()}`);
 	try {
 		logToFile(
@@ -118,8 +134,9 @@ export async function renderVideo(
 		const publicUrl = `${process.env.R2_PUBLIC_URL}/${filePath}`;
 		logToFile(`[${renderId}] Upload complete: ${publicUrl}`);
 
-		// Cleanup temporary file
+		// Cleanup local temp file and temp R2 audio
 		fs.unlinkSync(outputPath);
+		await deleteTempAudio(tempR2Keys);
 
 		// Mark as completed in database
 		await updateRenderStatus(renderId, {
@@ -137,6 +154,9 @@ export async function renderVideo(
 
 		logToFile(`[${renderId}] Render failed: ${errorMessage}`);
 		console.error(`[${renderId}] Render failed:`, errorMessage);
+
+		// Clean up temp R2 audio even on failure
+		await deleteTempAudio(tempR2Keys);
 
 		// Mark as failed in database
 		await updateRenderStatus(renderId, {

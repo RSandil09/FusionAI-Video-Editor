@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 	}
 
 	try {
-		const res = await fetch(url, { next: { revalidate: 60 } }); // cache for 60s
+		const res = await fetch(url, { next: { revalidate: 60 }, signal: AbortSignal.timeout(10_000) }); // cache for 60s
 		if (!res.ok) {
 			throw new Error(`Giphy responded with ${res.status}`);
 		}

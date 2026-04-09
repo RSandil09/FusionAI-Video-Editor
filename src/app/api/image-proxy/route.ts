@@ -106,8 +106,14 @@ export async function GET(request: NextRequest) {
 		// Cache control
 		responseHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
 
-		// CORS headers
-		responseHeaders.set("Access-Control-Allow-Origin", "*");
+		// CORS headers — restrict to same origin
+		const requestOrigin = request.headers.get("origin");
+		const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+		if (requestOrigin && appUrl && requestOrigin === appUrl) {
+			responseHeaders.set("Access-Control-Allow-Origin", requestOrigin);
+		} else if (appUrl) {
+			responseHeaders.set("Access-Control-Allow-Origin", appUrl);
+		}
 		responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
 		responseHeaders.set("Access-Control-Allow-Headers", "Range, Content-Type");
 		responseHeaders.set(
@@ -140,10 +146,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function OPTIONS(request: NextRequest) {
+	const requestOrigin = request.headers.get("origin");
+	const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+	const allowOrigin = (requestOrigin && appUrl && requestOrigin === appUrl)
+		? requestOrigin
+		: (appUrl || "");
 	return new NextResponse(null, {
 		status: 200,
 		headers: {
-			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Origin": allowOrigin,
 			"Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
 			"Access-Control-Allow-Headers": "Range, Content-Type",
 			"Access-Control-Expose-Headers":
@@ -185,7 +196,13 @@ export async function HEAD(request: NextRequest) {
 		}
 
 		responseHeaders.set("Accept-Ranges", "bytes");
-		responseHeaders.set("Access-Control-Allow-Origin", "*");
+		const headOrigin = request.headers.get("origin");
+		const headAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+		if (headOrigin && headAppUrl && headOrigin === headAppUrl) {
+			responseHeaders.set("Access-Control-Allow-Origin", headOrigin);
+		} else if (headAppUrl) {
+			responseHeaders.set("Access-Control-Allow-Origin", headAppUrl);
+		}
 		responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
 		responseHeaders.set("Access-Control-Allow-Headers", "Range, Content-Type");
 		responseHeaders.set(

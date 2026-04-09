@@ -35,7 +35,7 @@ export async function createProject(
 				frame_rate: data.frame_rate || 30,
 			})
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("❌ Supabase error creating project:");
@@ -47,8 +47,8 @@ export async function createProject(
 			return null;
 		}
 
-		console.log("✅ Project created successfully:", project.id);
-		return project;
+		console.log("✅ Project created successfully:", project?.id);
+		return project ?? null;
 	} catch (error) {
 		console.error("💥 Unexpected error creating project:");
 		console.error("Error type:", typeof error);
@@ -79,10 +79,9 @@ export async function getProjects(
 		const sortBy = options?.sortBy || "updated_at";
 		query = query.order(sortBy, { ascending: false });
 
-		// Apply limit
-		if (options?.limit) {
-			query = query.limit(options.limit);
-		}
+		// Apply limit — default 100 to prevent unbounded fetches
+		const limit = options?.limit ?? 100;
+		query = query.limit(limit);
 
 		const { data, error } = await query;
 
@@ -99,15 +98,16 @@ export async function getProjects(
 }
 
 /**
- * Get a single project by ID
+ * Get a single project by ID.
+ * Passing userId adds an ownership filter so users cannot read other users' projects
+ * even if Supabase RLS is misconfigured.
  */
-export async function getProject(projectId: string): Promise<Project | null> {
+export async function getProject(projectId: string, userId?: string): Promise<Project | null> {
 	try {
-		const { data, error } = await supabase
-			.from("projects")
-			.select("*")
-			.eq("id", projectId)
-			.single();
+		let query = supabase.from("projects").select("*").eq("id", projectId);
+		if (userId) query = query.eq("user_id", userId);
+
+		const { data, error } = await query.maybeSingle();
 
 		if (error) {
 			console.error("Error fetching project:", error);
@@ -134,15 +134,15 @@ export async function updateProject(
 			.update(updates)
 			.eq("id", projectId)
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error updating project:", error);
 			return null;
 		}
 
-		console.log("✅ Project updated:", data.name);
-		return data;
+		console.log("✅ Project updated:", data?.name);
+		return data ?? null;
 	} catch (error) {
 		console.error("Failed to update project:", error);
 		return null;
@@ -172,14 +172,15 @@ export async function updateLastAccessed(projectId: string): Promise<boolean> {
 }
 
 /**
- * Delete a project
+ * Delete a project — userId is required to prevent deleting another user's project.
  */
-export async function deleteProject(projectId: string): Promise<boolean> {
+export async function deleteProject(projectId: string, userId: string): Promise<boolean> {
 	try {
 		const { error } = await supabase
 			.from("projects")
 			.delete()
-			.eq("id", projectId);
+			.eq("id", projectId)
+			.eq("user_id", userId);
 
 		if (error) {
 			console.error("Error deleting project:", error);

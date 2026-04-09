@@ -104,6 +104,26 @@ async function handleFileUpload(
 	const arrayBuffer = await file.arrayBuffer();
 	const buffer = Buffer.from(arrayBuffer);
 
+	// Enforce 500 MB upload size limit
+	const MAX_FILE_SIZE = 500 * 1024 * 1024;
+	if (buffer.length > MAX_FILE_SIZE) {
+		return NextResponse.json(
+			{ error: "File too large", message: "Maximum upload size is 500 MB" },
+			{ status: 413 },
+		);
+	}
+
+	// Validate MIME type against allowlist (file.type is client-controlled — use it only for the DB record,
+	// but block obviously dangerous types here)
+	const ALLOWED_MIME_PREFIXES = ["video/", "image/", "audio/"];
+	const clientType = file.type.toLowerCase().split(";")[0].trim();
+	if (!ALLOWED_MIME_PREFIXES.some((p) => clientType.startsWith(p))) {
+		return NextResponse.json(
+			{ error: "Unsupported file type", message: "Only video, image, and audio files are allowed" },
+			{ status: 415 },
+		);
+	}
+
 	// Generate R2 key and upload
 	const key = generateUploadKey(userId, file.name);
 	const url = await uploadToR2(key, buffer, file.type);
@@ -172,13 +192,47 @@ async function handleUrlImport(
 	}
 	const { url } = parsed.data;
 
-	// Download file from URL
+	// SSRF protection — block private/internal IP ranges
+	try {
+		const parsed_url = new URL(url);
+		const hostname = parsed_url.hostname.toLowerCase();
+		const BLOCKED = [
+			/^localhost$/,
+			/^127\./,
+			/^10\./,
+			/^172\.(1[6-9]|2\d|3[01])\./,
+			/^192\.168\./,
+			/^169\.254\./,  // link-local / AWS metadata
+			/^::1$/,
+			/^fc00:/,
+			/^fe80:/,
+		];
+		if (BLOCKED.some((r) => r.test(hostname))) {
+			return NextResponse.json(
+				{ error: "URL not allowed", message: "Requests to internal addresses are blocked" },
+				{ status: 400 },
+			);
+		}
+	} catch {
+		return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+	}
+
+	// Download file from URL with a 200 MB size cap
+	const MAX_IMPORT_SIZE = 200 * 1024 * 1024;
 	const response = await axios.get(url, {
 		responseType: "arraybuffer",
-		timeout: 60000, // 60 second timeout
+		timeout: 60000,
+		maxContentLength: MAX_IMPORT_SIZE,
+		maxBodyLength: MAX_IMPORT_SIZE,
 	});
 
 	const buffer = Buffer.from(response.data);
+	if (buffer.length > MAX_IMPORT_SIZE) {
+		return NextResponse.json(
+			{ error: "File too large", message: "Maximum import size is 200 MB" },
+			{ status: 413 },
+		);
+	}
 	const contentType =
 		response.headers["content-type"] || "application/octet-stream";
 

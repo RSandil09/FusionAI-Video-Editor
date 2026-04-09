@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, randomBytes } from "crypto";
 import { getUserFromRequest } from "@/lib/auth-helpers";
+
+function buildSignedState(userId: string): string {
+	const secret = process.env.OAUTH_STATE_SECRET;
+	if (!secret) throw new Error("OAUTH_STATE_SECRET not set in environment");
+	const nonce = randomBytes(16).toString("hex");
+	const payload = Buffer.from(JSON.stringify({ userId, nonce })).toString("base64url");
+	const sig = createHmac("sha256", secret).update(payload).digest("hex");
+	return `${payload}.${sig}`;
+}
 
 /**
  * GET /api/social-connections/[provider]/connect
@@ -31,9 +41,7 @@ export async function GET(
 		const scope = encodeURIComponent(
 			"https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
 		);
-		const state = Buffer.from(JSON.stringify({ userId: user.id })).toString(
-			"base64url",
-		);
+		const state = buildSignedState(user.id);
 		const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}&access_type=offline&prompt=consent`;
 		return NextResponse.redirect(url);
 	}

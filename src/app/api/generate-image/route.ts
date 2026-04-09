@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
 					Authorization: `Bearer ${togetherApiKey}`,
 					"Content-Type": "application/json",
 				},
+				signal: AbortSignal.timeout(60_000),
 				body: JSON.stringify({
 					model: "black-forest-labs/FLUX.1-schnell-Free",
 					prompt: fullPrompt,

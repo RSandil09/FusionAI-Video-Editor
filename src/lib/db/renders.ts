@@ -32,7 +32,7 @@ export async function createRender(data: RenderInsert): Promise<Render | null> {
 				started_at: new Date().toISOString(),
 			})
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("❌ Error creating render:", error);
@@ -56,7 +56,7 @@ export async function getRender(renderId: string): Promise<Render | null> {
 			.from("renders")
 			.select("*")
 			.eq("id", renderId)
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error fetching render:", error);
@@ -90,7 +90,7 @@ export async function updateRenderStatus(
 			.update(updateData)
 			.eq("id", renderId)
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error updating render:", error);

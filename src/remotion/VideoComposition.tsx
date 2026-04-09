@@ -1,4 +1,4 @@
-import { AbsoluteFill, useCurrentFrame, Img, OffthreadVideo } from "remotion";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
 import React from "react";
 import { SequenceItem } from "../features/editor/player/sequence-item";
 import { groupTrackItems } from "../features/editor/utils/track-items";
@@ -35,6 +35,36 @@ function resolveMediaSrc(src: string): string {
 		}
 	}
 	return src;
+}
+
+/**
+ * Collects unique (fontFamily, fontUrl) pairs from all text/caption items
+ * and returns a <style> block with @font-face rules.
+ * This is the only way to make custom fonts available to Puppeteer during render.
+ */
+function FontFaceInjector({
+	trackItemsMap,
+}: {
+	trackItemsMap: Record<string, any>;
+}): React.ReactElement | null {
+	const seen = new Set<string>();
+	const rules: string[] = [];
+
+	for (const item of Object.values(trackItemsMap)) {
+		const details = item?.details;
+		if (!details) continue;
+		const { fontFamily, fontUrl } = details;
+		if (!fontFamily || !fontUrl) continue;
+		const key = `${fontFamily}::${fontUrl}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		rules.push(
+			`@font-face { font-family: '${fontFamily}'; src: url('${fontUrl}'); font-display: block; }`,
+		);
+	}
+
+	if (rules.length === 0) return null;
+	return <style>{rules.join("\n")}</style>;
 }
 
 /**
@@ -89,6 +119,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
 				height: size.height,
 			}}
 		>
+			<FontFaceInjector trackItemsMap={trackItemsMap} />
 			{groupedItems.map((group, index) => {
 				if (group.length === 1) {
 					const item = trackItemsMap[group[0].id];

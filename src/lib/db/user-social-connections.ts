@@ -39,9 +39,9 @@ export async function getSocialConnection(
 		.eq("user_id", userId)
 		.eq("provider", provider)
 		.eq("is_active", true)
-		.single();
+		.maybeSingle();
 
-	if (error && error.code !== "PGRST116") {
+	if (error) {
 		console.error("Error fetching social connection:", error);
 		return null;
 	}
@@ -62,13 +62,13 @@ export async function upsertSocialConnection(
 			{ onConflict: "user_id,provider" },
 		)
 		.select()
-		.single();
+		.maybeSingle();
 
 	if (error) {
 		console.error("Error upserting social connection:", error);
 		return null;
 	}
-	return conn;
+	return conn ?? null;
 }
 
 export async function disconnectSocial(

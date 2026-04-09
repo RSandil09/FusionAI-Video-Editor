@@ -1,5 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
 import { upsertSocialConnection } from "@/lib/db/user-social-connections";
+
+function verifySignedState(state: string): { userId: string } | null {
+	const secret = process.env.OAUTH_STATE_SECRET;
+	if (!secret) return null;
+	const dot = state.lastIndexOf(".");
+	if (dot < 0) return null;
+	const payload = state.slice(0, dot);
+	const sig = state.slice(dot + 1);
+	const expected = createHmac("sha256", secret).update(payload).digest("hex");
+	try {
+		if (!timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"))) return null;
+	} catch {
+		return null;
+	}
+	return JSON.parse(Buffer.from(payload, "base64url").toString());
+}
 
 /**
  * GET /api/social-connections/youtube/callback
@@ -25,12 +42,11 @@ export async function GET(request: NextRequest) {
 		return NextResponse.redirect(`${settingsUrl}?error=missing_params`);
 	}
 
-	let userId: string;
-	try {
-		userId = JSON.parse(Buffer.from(state, "base64url").toString()).userId;
-	} catch {
+	const stateData = verifySignedState(state);
+	if (!stateData?.userId) {
 		return NextResponse.redirect(`${settingsUrl}?error=invalid_state`);
 	}
+	const userId = stateData.userId;
 
 	const clientId = process.env.GOOGLE_CLIENT_ID;
 	const clientSecret = process.env.GOOGLE_CLIENT_SECRET;

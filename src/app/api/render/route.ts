@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { startRenderJob } from "@/lib/remotion-renderer";
 import { processAudioEffectsForRender } from "@/lib/ffmpeg-audio-processor";
-import { randomBytes } from "crypto";
+
 import { getUserFromRequest } from "@/lib/auth-helpers";
 import { createRender } from "@/lib/db/renders";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -94,8 +94,8 @@ export async function POST(request: Request) {
 
 		// 3.5 Pre-process Audio Effects via FFMPEG locally
 		console.log(`🎬 [${render.id}] Pre-processing Audio Effects...`);
-		const processedTrackItemsMap =
-			await processAudioEffectsForRender(trackItemsMap);
+		const { updatedMap: processedTrackItemsMap, tempR2Keys } =
+			await processAudioEffectsForRender(trackItemsMap, render.id);
 
 		// 4. Start rendering in background
 		console.log(`🎬 Starting render job ${render.id} in background...`);
@@ -113,6 +113,7 @@ export async function POST(request: Request) {
 				width,
 				height,
 				durationInFrames,
+				tempR2Keys,
 			});
 		} catch (renderError) {
 			console.error(`❌ Failed to start render job:`, renderError);

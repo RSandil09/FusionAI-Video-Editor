@@ -5,38 +5,83 @@
  * Load and edit a specific project by ID
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Component, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Editor from "@/features/editor";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { AppHeader } from "@/components/auth/app-header";
 import { getProject, updateLastAccessed } from "@/lib/db/projects";
+import { useAuth } from "@/components/auth/auth-provider";
 import { toast } from "sonner";
 import type { Database } from "@/lib/db/database.types";
+
+// ── Error Boundary — catches render errors in the Editor so users see a
+//    recoverable screen instead of a blank page ─────────────────────────────────
+class EditorErrorBoundary extends Component<
+	{ children: ReactNode },
+	{ hasError: boolean; message: string }
+> {
+	constructor(props: { children: ReactNode }) {
+		super(props);
+		this.state = { hasError: false, message: "" };
+	}
+	static getDerivedStateFromError(error: unknown) {
+		return {
+			hasError: true,
+			message: error instanceof Error ? error.message : String(error),
+		};
+	}
+	render() {
+		if (this.state.hasError) {
+			return (
+				<div className="flex items-center justify-center h-screen bg-background">
+					<div className="text-center max-w-md px-6">
+						<h2 className="text-2xl font-semibold mb-2 text-destructive">Editor crashed</h2>
+						<p className="text-muted-foreground mb-2 text-sm">
+							Something went wrong while rendering the editor.
+						</p>
+						<p className="text-xs text-muted-foreground font-mono bg-muted rounded p-2 mb-6 break-all">
+							{this.state.message}
+						</p>
+						<button
+							onClick={() => window.location.reload()}
+							className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+						>
+							Reload editor
+						</button>
+					</div>
+				</div>
+			);
+		}
+		return this.props.children;
+	}
+}
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 function EditorContent() {
 	const params = useParams();
 	const router = useRouter();
+	const { user } = useAuth();
 	const projectId = params.projectId as string;
 	const [project, setProject] = useState<Project | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
 
 	useEffect(() => {
-		if (projectId) {
+		if (projectId && user) {
 			loadProject();
 		}
-	}, [projectId]);
+	}, [projectId, user]);
 
 	const loadProject = async () => {
+		if (!user) return;
 		setLoading(true);
 		setError(false);
 
 		try {
-			const projectData = await getProject(projectId);
+			// Pass userId so the query filters by ownership — prevents reading other users' projects
+			const projectData = await getProject(projectId, user.uid);
 
 			if (projectData) {
 				console.log("📦 DB Project Data Loaded:", {
@@ -112,16 +157,17 @@ function EditorContent() {
 	}
 
 	return (
-		<div className="flex flex-col h-screen">
-			{/* Editor */}
-			<div className="flex-1 overflow-hidden">
-				<Editor
-					initialState={project.editor_state}
-					projectId={project.id}
-					projectName={project.name}
-				/>
+		<EditorErrorBoundary>
+			<div className="flex flex-col h-screen">
+				<div className="flex-1 overflow-hidden">
+					<Editor
+						initialState={project.editor_state}
+						projectId={project.id}
+						projectName={project.name}
+					/>
+				</div>
 			</div>
-		</div>
+		</EditorErrorBoundary>
 	);
 }
 

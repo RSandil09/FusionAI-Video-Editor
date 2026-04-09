@@ -18,15 +18,15 @@ export async function createAsset(data: AssetInsert): Promise<Asset | null> {
 			.from("assets")
 			.insert(data)
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error creating asset:", error);
 			return null;
 		}
 
-		console.log("✅ Asset saved to database:", asset.file_name);
-		return asset;
+		console.log("✅ Asset saved to database:", asset?.file_name);
+		return asset ?? null;
 	} catch (error) {
 		console.error("Failed to create asset:", error);
 		return null;
@@ -92,7 +92,7 @@ export async function linkAssetToProject(
 			.update({ project_id: projectId })
 			.eq("id", assetId)
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error linking asset to project:", error);

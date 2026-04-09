@@ -14,6 +14,8 @@ export interface SequenceItemOptions {
 	size?: ISize;
 	frame?: number;
 	isTransition?: boolean;
+	/** When true, audio volume is forced to 0 (track is muted or not soloed) */
+	muteAudio?: boolean;
 }
 
 export const BaseSequence = ({

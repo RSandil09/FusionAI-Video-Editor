@@ -51,9 +51,40 @@ export async function POST(request: NextRequest) {
 
 	if (platform === "youtube") {
 		try {
+			// SSRF protection — only allow R2 URLs (our own storage) for sharing
+			let parsedVideoUrl: URL;
+			try {
+				parsedVideoUrl = new URL(videoUrl);
+			} catch {
+				return NextResponse.json({ error: "Invalid videoUrl" }, { status: 400 });
+			}
+			if (!parsedVideoUrl.hostname.endsWith(".r2.dev")) {
+				return NextResponse.json(
+					{ error: "videoUrl must be an R2 storage URL" },
+					{ status: 400 },
+				);
+			}
+
 			const videoRes = await fetch(videoUrl);
 			if (!videoRes.ok) throw new Error("Failed to fetch video");
+
+			// Enforce 2 GB max for YouTube uploads
+			const contentLength = Number(videoRes.headers.get("content-length") ?? 0);
+			const MAX_SHARE_SIZE = 2 * 1024 * 1024 * 1024;
+			if (contentLength > MAX_SHARE_SIZE) {
+				return NextResponse.json(
+					{ error: "Video too large for direct upload (max 2 GB)" },
+					{ status: 413 },
+				);
+			}
+
 			const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+			if (videoBuffer.length > MAX_SHARE_SIZE) {
+				return NextResponse.json(
+					{ error: "Video too large for direct upload (max 2 GB)" },
+					{ status: 413 },
+				);
+			}
 
 			const metadata = {
 				snippet: {

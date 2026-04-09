@@ -1,5 +1,5 @@
 import { SequenceItem } from "./sequence-item";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { dispatch, filter, subject } from "@designcombo/events";
 import { EDIT_OBJECT, ENTER_EDIT_MODE } from "@designcombo/state";
 import { groupTrackItems } from "../utils/track-items";
@@ -13,12 +13,15 @@ const Composition = () => {
 	const {
 		trackItemIds,
 		trackItemsMap,
+		tracks,
 		fps,
 		sceneMoveableRef,
 		size,
 		transitionsMap,
 		structure,
 		activeIds,
+		mutedTrackIds,
+		soloTrackIds,
 	} = useStore();
 	const frame = useCurrentFrame();
 
@@ -27,9 +30,44 @@ const Composition = () => {
 		transitionsMap,
 		trackItemsMap: trackItemsMap,
 	});
-	const mediaItems = Object.values(trackItemsMap).filter((item) => {
-		return item.type === "video" || item.type === "audio";
-	});
+
+	/**
+	 * Two separate sets drive playback visibility:
+	 *
+	 * hiddenItemIds  — items that must NOT render at all.
+	 *                  Caused by SOLO: when any track is soloed, every item on a
+	 *                  non-solo track is completely removed from the composition.
+	 *
+	 * audioMutedItemIds — items whose audio volume is forced to 0, but whose
+	 *                  visual still renders.
+	 *                  Caused by MUTE: video/image/text tracks show their visuals
+	 *                  but play no sound.
+	 *
+	 * Precedence: if an item is hidden it is never even checked for muteAudio.
+	 */
+	const { hiddenItemIds, audioMutedItemIds } = useMemo(() => {
+		const hidden = new Set<string>();
+		const muted = new Set<string>();
+		const hasSolo = soloTrackIds.length > 0;
+
+		for (const track of tracks) {
+			const itemIds: string[] = (track as any).items ?? (track as any).trackItemIds ?? [];
+			const isSoloActive = hasSolo && !soloTrackIds.includes(track.id);
+			const isMuted = mutedTrackIds.includes(track.id);
+
+			if (isSoloActive) {
+				// Non-solo track: hide everything — no visual, no audio
+				for (const id of itemIds) hidden.add(id);
+			} else if (isMuted) {
+				// Muted track: silence audio only, visuals still play
+				for (const id of itemIds) muted.add(id);
+			}
+		}
+		return { hiddenItemIds: hidden, audioMutedItemIds: muted };
+	}, [tracks, mutedTrackIds, soloTrackIds]);
+
+	/** Item types that carry no visual — skip entirely when audio-muted too */
+	const AUDIO_ONLY_TYPES = new Set(["audio"]);
 
 	const handleTextChange = (id: string, _: string) => {
 		const elRef = document.querySelector(`.id-${id}`) as HTMLDivElement;
@@ -193,6 +231,11 @@ const Composition = () => {
 			{groupedItems.map((group, index) => {
 				if (group.length === 1) {
 					const item = trackItemsMap[group[0].id];
+					// Solo: completely remove from composition (no visual, no audio)
+					if (hiddenItemIds.has(item.id)) return null;
+					const muteAudio = audioMutedItemIds.has(item.id);
+					// Mute on audio-only track: nothing to show, skip entirely
+					if (muteAudio && AUDIO_ONLY_TYPES.has(item.type)) return null;
 					return SequenceItem[item.type](item, {
 						fps,
 						handleTextChange,
@@ -201,9 +244,12 @@ const Composition = () => {
 						frame,
 						size,
 						isTransition: false,
+						muteAudio,
 					});
 				}
 				const firstItem = trackItemsMap[group[0].id];
+				// Solo: skip the whole transition group if first item is hidden
+				if (hiddenItemIds.has(firstItem.id)) return null;
 				const from = (firstItem.display.from / 1000) * fps;
 				return (
 					<TransitionSeries from={from} key={index}>
@@ -217,12 +263,18 @@ const Composition = () => {
 									direction: item.direction,
 								});
 							}
-							return SequenceItem[item.type](trackItemsMap[item.id], {
+							const trackItem = trackItemsMap[item.id];
+							if (hiddenItemIds.has(item.id)) return null;
+							const muteAudio = audioMutedItemIds.has(item.id);
+							return SequenceItem[item.type](trackItem, {
 								fps,
 								handleTextChange,
+								onTextBlur,
+								frame,
 								editableTextId,
 								isTransition: true,
 								size,
+								muteAudio,
 							});
 						})}
 					</TransitionSeries>

@@ -18,9 +18,9 @@ export async function getUserSettings(
 		.from("user_settings")
 		.select("*")
 		.eq("user_id", userId)
-		.single();
+		.maybeSingle();
 
-	if (error && error.code !== "PGRST116") {
+	if (error) {
 		console.error("Error fetching user settings:", error);
 		return null;
 	}
@@ -38,7 +38,7 @@ export async function upsertUserSettings(
 			{ onConflict: "user_id" },
 		)
 		.select()
-		.single();
+		.maybeSingle();
 
 	if (error) {
 		console.error("Error upserting user settings:", error);

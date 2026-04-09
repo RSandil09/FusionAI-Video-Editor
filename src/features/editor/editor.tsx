@@ -144,6 +144,17 @@ const Editor = ({
 				stateManager.updateState(editorState as any);
 			}
 
+			// Restore Zustand-only state persisted alongside the editor state.
+			// Filter out orphaned track IDs (tracks that no longer exist in the state).
+			const { setMarkers, setLockedTrackIds, setMutedTrackIds, setSoloTrackIds } = useStore.getState();
+			const s = editorState as any;
+			const existingTrackIds = new Set<string>((s.tracks ?? []).map((t: any) => t.id as string));
+			const filterTrackIds = (ids: string[]) => ids.filter((id) => existingTrackIds.has(id));
+			if (Array.isArray(s.markers))        setMarkers(s.markers);
+			if (Array.isArray(s.lockedTrackIds)) setLockedTrackIds(filterTrackIds(s.lockedTrackIds));
+			if (Array.isArray(s.mutedTrackIds))  setMutedTrackIds(filterTrackIds(s.mutedTrackIds));
+			if (Array.isArray(s.soloTrackIds))   setSoloTrackIds(filterTrackIds(s.soloTrackIds));
+
 			console.log(
 				"✅ Editor loaded with",
 				editorState.trackItemIds?.length,
@@ -176,21 +187,28 @@ const Editor = ({
 		]);
 	}, []);
 
-	// ── Auto-save: fires 3 s after the last state change ─────────────────────
+	// ── Auto-save: fires 3 s after the last change (tracks OR markers/locks) ─────
 	useEffect(() => {
 		if (!projectId) return;
 
-		const subscription = stateManager.subscribeToState(() => {
-			// Clear any pending save and restart the timer
+		// Shared debounced save — reads latest state at call time
+		const scheduleSave = () => {
 			if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-
 			autoSaveTimerRef.current = setTimeout(async () => {
 				try {
 					const editorState = stateManager.toJSON();
 					if (!editorState) return;
 
 					const token = await getIdToken();
-					if (!token) return;
+					if (!token) {
+						console.warn("Auto-save skipped: no auth token (session may have expired)");
+						setSaveStatus("error");
+						return;
+					}
+
+					// Merge Zustand-only fields that stateManager.toJSON() doesn't include
+					const { markers, lockedTrackIds, mutedTrackIds, soloTrackIds } = useStore.getState();
+					const fullState = { ...editorState, markers, lockedTrackIds, mutedTrackIds, soloTrackIds };
 
 					setSaveStatus("saving");
 					const res = await fetch(`/api/projects/${projectId}`, {
@@ -199,7 +217,7 @@ const Editor = ({
 							"Content-Type": "application/json",
 							Authorization: `Bearer ${token}`,
 						},
-						body: JSON.stringify({ editor_state: editorState }),
+						body: JSON.stringify({ editor_state: fullState }),
 					});
 
 					if (res.ok) {
@@ -214,10 +232,26 @@ const Editor = ({
 					setTimeout(() => setSaveStatus("idle"), 3000);
 				}
 			}, 3000);
+		};
+
+		// 1. Save when StateManager tracks/items change
+		const stateSubscription = stateManager.subscribeToState(scheduleSave);
+
+		// 2. Save when any Zustand-only state changes (markers, locks, mute, solo)
+		const zustandUnsub = useStore.subscribe((next, prev) => {
+			if (
+				next.markers !== prev.markers ||
+				next.lockedTrackIds !== prev.lockedTrackIds ||
+				next.mutedTrackIds !== prev.mutedTrackIds ||
+				next.soloTrackIds !== prev.soloTrackIds
+			) {
+				scheduleSave();
+			}
 		});
 
 		return () => {
-			subscription.unsubscribe();
+			stateSubscription.unsubscribe();
+			zustandUnsub();
 			if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 		};
 	}, [projectId]);

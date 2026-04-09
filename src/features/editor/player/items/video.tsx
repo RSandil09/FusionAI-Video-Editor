@@ -35,7 +35,7 @@ export const Video = ({
 	item: IVideo;
 	options: SequenceItemOptions;
 }) => {
-	const { fps, frame } = options;
+	const { fps, frame, muteAudio } = options;
 	const { details, animations } = item;
 	const playbackRate = item.playbackRate || 1;
 	const { animationIn, animationOut, animationTimed } = getAnimations(
@@ -82,7 +82,7 @@ export const Video = ({
 							endAt={(item.trim?.to! / 1000) * fps || 1 / fps}
 							playbackRate={playbackRate}
 							src={videoSrc}
-							volume={details.volume || 0 / 100}
+							volume={muteAudio ? 0 : (details.volume || 0) / 100}
 							onError={(e) => {
 								console.error("Video playback error:", e, "URL:", videoSrc);
 							}}

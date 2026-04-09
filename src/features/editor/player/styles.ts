@@ -56,6 +56,28 @@ export const calculateTextStyles = (
 	borderRadius: `${Math.min(details.width, details.height) * ((details.borderRadius || 0) / 100)}px`,
 });
 
+function buildFilter(details: ITrackItem["details"]): string {
+	const brightness = details.brightness ?? 100;
+	const blur = details.blur ?? 0;
+	if (brightness === 100 && blur === 0) return "none";
+	const parts: string[] = [];
+	if (brightness !== 100) parts.push(`brightness(${brightness}%)`);
+	if (blur !== 0) parts.push(`blur(${blur}px)`);
+	return parts.join(" ") || "none";
+}
+
+function buildTransform(details: ITrackItem["details"]): string {
+	const existing = details.transform || "";
+	const rotate = details.rotate;
+	if (!rotate || rotate === "0deg" || rotate === "0") return existing || "none";
+	// If transform already contains rotate, honour it; otherwise append
+	if (existing && existing !== "none") {
+		if (existing.includes("rotate")) return existing;
+		return `${existing} rotate(${rotate})`;
+	}
+	return `rotate(${rotate})`;
+}
+
 export const calculateContainerStyles = (
 	details: ITrackItem["details"],
 	crop: ITrackItem["details"]["crop"] = {},
@@ -74,8 +96,8 @@ export const calculateContainerStyles = (
 		transform: details.transform || "none",
 		opacity: details.opacity !== undefined ? details.opacity / 100 : 1,
 		transformOrigin: details.transformOrigin || "center center",
-		filter: `brightness(${details.brightness}%) blur(${details.blur}px)`,
-		rotate: details.rotate || "0deg",
+		filter: buildFilter(details),
+		transform: buildTransform(details),
 		...overrides, // Merge overrides into the calculated styles
 	};
 };

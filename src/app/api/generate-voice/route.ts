@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
 					Authorization: `Bearer ${accessToken}`,
 					"Content-Type": "application/json",
 				},
+				signal: AbortSignal.timeout(30_000),
 				body: JSON.stringify({
 					input: { text },
 					voice: {

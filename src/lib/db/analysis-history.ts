@@ -46,13 +46,13 @@ export async function saveAnalysisToHistory(
 					analysis.segments as unknown as Database["public"]["Tables"]["analysis_history"]["Row"]["segments"],
 			})
 			.select()
-			.single();
+			.maybeSingle();
 
 		if (error) {
 			console.error("Error saving analysis to history:", error);
 			return null;
 		}
-		return data;
+		return data ?? null;
 	} catch (err) {
 		console.error("Failed to save analysis history:", err);
 		return null;

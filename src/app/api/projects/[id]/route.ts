@@ -71,15 +71,34 @@ export async function PATCH(
 		console.log("   name:", name);
 
 		const updatePayload: Record<string, unknown> = {};
-		if (editor_state !== undefined) updatePayload.editor_state = editor_state;
-		if (name !== undefined) updatePayload.name = name;
+
+		if (editor_state !== undefined) {
+			// Validate minimum required shape before persisting — prevents corrupted state overwriting good data
+			if (
+				typeof editor_state !== "object" ||
+				editor_state === null ||
+				typeof editor_state.trackItemsMap !== "object" ||
+				!Array.isArray(editor_state.trackItemIds)
+			) {
+				console.error("   ❌ editor_state failed structure validation");
+				return NextResponse.json(
+					{ message: "Invalid editor_state: must contain trackItemsMap (object) and trackItemIds (array)" },
+					{ status: 400 },
+				);
+			}
+			updatePayload.editor_state = editor_state;
+		}
+
+		if (name !== undefined) {
+			if (typeof name !== "string" || name.trim().length === 0) {
+				return NextResponse.json({ message: "name must be a non-empty string" }, { status: 400 });
+			}
+			updatePayload.name = name.trim();
+		}
 
 		if (Object.keys(updatePayload).length === 0) {
 			return NextResponse.json(
-				{
-					message:
-						"Nothing to update — provide editor_state or name in the request body",
-				},
+				{ message: "Nothing to update — provide editor_state or name in the request body" },
 				{ status: 400 },
 			);
 		}

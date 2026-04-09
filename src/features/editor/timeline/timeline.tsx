@@ -1,434 +1,351 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Header from "./header";
 import Ruler from "./ruler";
-import { timeMsToUnits, unitsToTimeMs } from "@designcombo/timeline";
-import CanvasTimeline from "./items/timeline";
+import { timeMsToUnits, unitsToTimeMs } from "./engine/types";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import { dispatch, filter, subject } from "@designcombo/events";
-import {
-	TIMELINE_BOUNDING_CHANGED,
-	TIMELINE_PREFIX,
-} from "@designcombo/timeline";
+import { filter, subject } from "@designcombo/events";
+import { TIMELINE_BOUNDING_CHANGED, TIMELINE_PREFIX } from "@designcombo/timeline";
 import useStore from "../store/use-store";
-import Playhead from "./playhead";
 import { useCurrentPlayerFrame } from "../hooks/use-current-frame";
-import {
-	Audio,
-	Image,
-	Text,
-	Video,
-	Caption,
-	Helper,
-	Track,
-	LinealAudioBars,
-	RadialAudioBars,
-	WaveAudioBars,
-	HillAudioBars,
-} from "./items";
-import StateManager, { REPLACE_MEDIA } from "@designcombo/state";
+import StateManager from "@designcombo/state";
 import {
 	TIMELINE_OFFSET_CANVAS_LEFT,
 	TIMELINE_OFFSET_CANVAS_RIGHT,
 } from "../constants/constants";
-import { ITrackItem } from "@designcombo/types";
-import PreviewTrackItem from "./items/preview-drag-item";
 import { useTimelineOffsetX } from "../hooks/use-timeline-offset";
-import { useStateManagerEvents } from "../hooks/use-state-manager-events";
 import TrackLabels from "./track-labels";
+import { CanvasEngine } from "./engine/canvas-engine";
+import { buildEngineCallbacks } from "../hooks/use-engine-sync";
 
-CanvasTimeline.registerItems({
-	Text,
-	Image,
-	Audio,
-	Video,
-	Caption,
-	Helper,
-	Track,
-	PreviewTrackItem,
-	LinealAudioBars,
-	RadialAudioBars,
-	WaveAudioBars,
-	HillAudioBars,
-});
+// ── Constants — must match canvas-engine.ts ───────────────────────────────────
+const SIZES_MAP: Record<string, number> = {
+	caption: 32,
+	text: 32,
+	audio: 36,
+	customTrack: 40,
+	customTrack2: 40,
+	linealAudioBars: 40,
+	radialAudioBars: 40,
+	waveAudioBars: 40,
+	hillAudioBars: 40,
+};
+const TRACK_GAP = 8;
+const CANVAS_TOP_OFFSET = 24;
 
-const EMPTY_SIZE = { width: 0, height: 0 };
 const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
-	// prevent duplicate scroll events
-	const canScrollRef = useRef(false);
 	const timelineContainerRef = useRef<HTMLDivElement>(null);
-	const [scrollLeft, setScrollLeft] = useState(0);
-	const containerRef = useRef<HTMLDivElement>(null);
+	const canvasContainerRef = useRef<HTMLDivElement>(null);
 	const canvasElRef = useRef<HTMLCanvasElement>(null);
-	const canvasRef = useRef<CanvasTimeline | null>(null);
-	const verticalScrollbarVpRef = useRef<HTMLDivElement>(null);
-	const horizontalScrollbarVpRef = useRef<HTMLDivElement>(null);
-	const { scale, playerRef, fps, duration, setState, timeline } = useStore();
-	const currentFrame = useCurrentPlayerFrame(playerRef);
-	const [canvasSize, setCanvasSize] = useState(EMPTY_SIZE);
-	const [size, setSize] = useState<{ width: number; height: number }>(
-		EMPTY_SIZE,
-	);
+	const engineRef = useRef<CanvasEngine | null>(null);
 
-	useEffect(() => {
-		console.log("📏 Timeline mounted/updated:", {
-			canvasSize,
-			size,
-			scale,
-			duration,
-		});
-	}, [canvasSize, size, scale, duration]);
+	const horizontalScrollbarVpRef = useRef<HTMLDivElement>(null);
+	const verticalScrollbarVpRef = useRef<HTMLDivElement>(null);
+
+	const [scrollLeft, setScrollLeft] = useState(0);
+	const [scrollTop, setScrollTop] = useState(0);
+	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+	const [scrollSize, setScrollSize] = useState({ width: 0, height: 0 });
+
+	const {
+		scale, playerRef, fps, duration,
+		tracks, trackItemsMap, transitionsMap,
+		activeIds, setTimeline,
+		lockedTrackIds, mutedTrackIds, soloTrackIds,
+		markers,
+	} = useStore();
+
+	const currentFrame = useCurrentPlayerFrame(playerRef);
 	const timelineOffsetX = useTimelineOffsetX();
 
-	const { setTimeline } = useStore();
-
-	// stateManager events are now handled in the parent Editor component
-	// to ensure state sync happens even before the Timeline is mounted
-	// useStateManagerEvents(stateManager);
-
-	const onScroll = (v: { scrollTop: number; scrollLeft: number }) => {
-		if (horizontalScrollbarVpRef.current && verticalScrollbarVpRef.current) {
-			verticalScrollbarVpRef.current.scrollTop = -v.scrollTop;
-			horizontalScrollbarVpRef.current.scrollLeft = -v.scrollLeft;
-			setScrollLeft(-v.scrollLeft);
+	// ── Engine scroll callback — updates both scrollbars and track labels ────────
+	const onScroll = useCallback((v: { scrollTop?: number; scrollLeft?: number }) => {
+		if (v.scrollLeft !== undefined) {
+			if (horizontalScrollbarVpRef.current)
+				horizontalScrollbarVpRef.current.scrollLeft = v.scrollLeft;
+			setScrollLeft(v.scrollLeft);
 		}
-	};
-
-	useEffect(() => {
-		if (playerRef?.current) {
-			canScrollRef.current = playerRef?.current.isPlaying();
+		if (v.scrollTop !== undefined) {
+			if (verticalScrollbarVpRef.current)
+				verticalScrollbarVpRef.current.scrollTop = v.scrollTop;
+			setScrollTop(v.scrollTop);
 		}
-	}, [playerRef?.current?.isPlaying()]);
+	}, []);
 
+	const onResizeCanvas = useCallback((size: { width: number; height: number }) => {
+		setCanvasSize(size);
+	}, []);
+
+	// ── Mount engine once ────────────────────────────────────────────────────────
 	useEffect(() => {
+		const canvasEl = canvasElRef.current;
+		const containerEl = canvasContainerRef.current;
+		if (!canvasEl || !containerEl) return;
+
+		// Remove any Fabric.js remnants (.canvas-container + .upper-canvas)
+		const canvasParent = canvasEl.parentElement;
+		if (canvasParent && canvasParent.classList.contains("canvas-container")) {
+			const grandParent = canvasParent.parentElement;
+			if (grandParent) {
+				grandParent.insertBefore(canvasEl, canvasParent);
+				grandParent.removeChild(canvasParent);
+			}
+		}
+		containerEl.querySelectorAll(".upper-canvas").forEach((el) => el.remove());
+
+		const rect = containerEl.getBoundingClientRect();
+		const containerWidth = Math.max(rect.width, 400);
+		const containerHeight = Math.max(rect.height, 200);
+
+		const callbacks = buildEngineCallbacks(stateManager, fps, playerRef, engineRef);
+
+		const eng = new CanvasEngine(canvasEl, {
+			canvas: canvasEl,
+			width: containerWidth,
+			height: containerHeight,
+			spacing: { left: TIMELINE_OFFSET_CANVAS_LEFT, right: TIMELINE_OFFSET_CANVAS_RIGHT },
+			scale,
+			duration,
+			fps,
+			sizesMap: SIZES_MAP,
+			trackGap: TRACK_GAP,
+			canvasTopOffset: CANVAS_TOP_OFFSET,
+			selectionColor: "rgba(0,216,214,0.1)",
+			selectionBorderColor: "rgba(0,216,214,1)",
+			guideLineColor: "#00d8d6",
+			...callbacks,
+			onScroll,
+			onResizeCanvas,
+		});
+
+		engineRef.current = eng;
+		setTimeline(eng as any);
+		setCanvasSize({ width: containerWidth, height: containerHeight });
+
+		eng.syncFromState({
+			tracks,
+			trackItemsMap,
+			transitionsMap,
+			duration,
+			scale,
+			sizesMap: SIZES_MAP,
+			trackGap: TRACK_GAP,
+			canvasTopOffset: CANVAS_TOP_OFFSET,
+			activeIds,
+		});
+
+		// Restore persisted markers from the store into the engine
+		const savedMarkers = useStore.getState().markers;
+		if (savedMarkers.length) eng.setMarkers(savedMarkers);
+
+		return () => {
+			eng.purge();
+			engineRef.current = null;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	// ── ResizeObserver — keep canvas filling its container ───────────────────────
+	useEffect(() => {
+		const containerEl = canvasContainerRef.current;
+		if (!containerEl) return;
+		const ro = new ResizeObserver(([entry]) => {
+			const { width, height } = entry.contentRect;
+			if (width > 10 && height > 10 && engineRef.current) {
+				engineRef.current.resize({ width, height });
+				setCanvasSize({ width, height });
+			}
+		});
+		ro.observe(containerEl);
+		return () => ro.disconnect();
+	}, []);
+
+	// ── Sync structural state → engine (tracks/items/scale/duration + meta) ──────
+	// Meta (locked/muted/solo) is applied in the same effect so there's no
+	// 1-frame flash where rows briefly show as unlocked/unmuted.
+	useEffect(() => {
+		const eng = engineRef.current;
+		if (!eng) return;
+		eng.syncFromState({
+			tracks,
+			trackItemsMap,
+			transitionsMap,
+			duration,
+			scale,
+			sizesMap: SIZES_MAP,
+			trackGap: TRACK_GAP,
+			canvasTopOffset: CANVAS_TOP_OFFSET,
+			// activeIds intentionally omitted — handled by the dedicated effect below
+		});
+		for (const row of eng.getTrackRows()) {
+			eng.setTrackMeta(row.id, {
+				locked: lockedTrackIds.includes(row.id),
+				muted:  mutedTrackIds.includes(row.id),
+				solo:   soloTrackIds.includes(row.id),
+			});
+		}
+	}, [tracks, trackItemsMap, transitionsMap, scale, duration, lockedTrackIds, mutedTrackIds, soloTrackIds]);
+
+	// ── Sync selection only — lightweight, no full rebuild ────────────────────────
+	useEffect(() => {
+		engineRef.current?.setActiveIds(activeIds);
+	}, [activeIds]);
+
+	// ── Sync markers from store → engine (covers restore-from-DB on load) ────────
+	useEffect(() => {
+		if (!engineRef.current) return;
+		engineRef.current.setMarkers(markers);
+	}, [markers]);
+
+	// ── Playhead ─────────────────────────────────────────────────────────────────
+	useEffect(() => {
+		if (!engineRef.current || !fps) return;
+		engineRef.current.setPlayheadMs((currentFrame / fps) * 1000);
+	}, [currentFrame, fps]);
+
+	// ── Auto-scroll canvas to keep playhead visible ──────────────────────────────
+	useEffect(() => {
+		const hVp = horizontalScrollbarVpRef.current;
+		if (!hVp || !fps) return;
 		const position = timeMsToUnits((currentFrame / fps) * 1000, scale.zoom);
 		const canvasEl = canvasElRef.current;
-		const horizontalScrollbar = horizontalScrollbarVpRef.current;
-
-		if (!canvasEl || !horizontalScrollbar) return;
-
-		const canvasBoudingX =
-			canvasEl.getBoundingClientRect().x + canvasEl.clientWidth;
-		const playHeadPos = position - scrollLeft + 40;
-		if (playHeadPos >= canvasBoudingX) {
-			const scrollDivWidth = horizontalScrollbar.clientWidth;
-			const totalScrollWidth = horizontalScrollbar.scrollWidth;
-			const currentPosScroll = horizontalScrollbar.scrollLeft;
-			const availableScroll =
-				totalScrollWidth - (scrollDivWidth + currentPosScroll);
-			const scaleScroll = availableScroll / scrollDivWidth;
-			if (scaleScroll >= 0) {
-				if (scaleScroll > 1)
-					horizontalScrollbar.scrollTo({
-						left: currentPosScroll + scrollDivWidth,
-					});
-				else
-					horizontalScrollbar.scrollTo({
-						left: totalScrollWidth - scrollDivWidth,
-					});
+		if (!canvasEl) return;
+		const boundX = canvasEl.getBoundingClientRect().x + canvasEl.clientWidth;
+		if (position - scrollLeft + 40 >= boundX) {
+			const total = hVp.scrollWidth;
+			const vp = hVp.clientWidth;
+			const cur = hVp.scrollLeft;
+			const available = total - vp - cur;
+			if (available >= 0) {
+				hVp.scrollTo({ left: available > vp ? cur + vp : total - vp });
 			}
 		}
 	}, [currentFrame]);
 
-	const onResizeCanvas = (payload: { width: number; height: number }) => {
-		setCanvasSize({
-			width: payload.width,
-			height: payload.height,
-		});
-	};
-
+	// ── Listen for legacy TIMELINE_BOUNDING_CHANGED events ──────────────────────
 	useEffect(() => {
-		const canvasEl = canvasElRef.current;
-		const timelineContainerEl = timelineContainerRef.current;
-
-		if (!canvasEl || !timelineContainerEl) return;
-
-		const containerWidth = timelineContainerEl.clientWidth - timelineOffsetX;
-		const containerHeight = timelineContainerEl.clientHeight - 90;
-		const canvas = new CanvasTimeline(canvasEl, {
-			width: containerWidth,
-			height: containerHeight,
-			bounding: {
-				width: containerWidth,
-				height: 0,
-			},
-			selectionColor: "rgba(0, 216, 214,0.1)",
-			selectionBorderColor: "rgba(0, 216, 214,1.0)",
-			onScroll,
-			onResizeCanvas,
-			scale: scale,
-			state: stateManager,
-			duration,
-			spacing: {
-				left: TIMELINE_OFFSET_CANVAS_LEFT,
-				right: TIMELINE_OFFSET_CANVAS_RIGHT,
-			},
-			sizesMap: {
-				caption: 32,
-				text: 32,
-				audio: 36,
-				customTrack: 40,
-				customTrack2: 40,
-				linealAudioBars: 40,
-				radialAudioBars: 40,
-				waveAudioBars: 40,
-				hillAudioBars: 40,
-			},
-			itemTypes: [
-				"text",
-				"image",
-				"audio",
-				"video",
-				"caption",
-				"helper",
-				"track",
-				"composition",
-				"template",
-				"linealAudioBars",
-				"radialAudioBars",
-				"progressFrame",
-				"progressBar",
-				"waveAudioBars",
-				"hillAudioBars",
-			],
-			acceptsMap: {
-				text: ["text", "caption"],
-				image: ["image", "video"],
-				video: ["video", "image"],
-				audio: ["audio"],
-				caption: ["caption", "text"],
-				template: ["template"],
-				customTrack: ["video", "image"],
-				customTrack2: ["video", "image"],
-				main: ["video", "image"],
-				linealAudioBars: ["audio", "linealAudioBars"],
-				radialAudioBars: ["audio", "radialAudioBars"],
-				waveAudioBars: ["audio", "waveAudioBars"],
-				hillAudioBars: ["audio", "hillAudioBars"],
-			},
-			guideLineColor: "#ffffff",
-		});
-
-		canvasRef.current = canvas;
-
-		setCanvasSize({ width: containerWidth, height: containerHeight });
-		setSize({
-			width: containerWidth,
-			height: 0,
-		});
-		setTimeline(canvas);
-
-		return () => {
-			canvas.purge();
-		};
-	}, []);
-
-	const handleOnScrollH = (e: React.UIEvent<HTMLDivElement, UIEvent>) => {
-		const scrollLeft = e.currentTarget.scrollLeft;
-		if (canScrollRef.current) {
-			const canvas = canvasRef.current;
-			if (canvas) {
-				canvas.scrollTo({ scrollLeft });
-			}
-		}
-		setScrollLeft(scrollLeft);
-	};
-
-	const handleOnScrollV = (e: React.UIEvent<HTMLDivElement, UIEvent>) => {
-		const scrollTop = e.currentTarget.scrollTop;
-		if (canScrollRef.current) {
-			const canvas = canvasRef.current;
-			if (canvas) {
-				canvas.scrollTo({ scrollTop });
-			}
-		}
-	};
-
-	useEffect(() => {
-		const addEvents = subject.pipe(
-			filter(({ key }) => key.startsWith(TIMELINE_PREFIX)),
-		);
-
-		const subscription = addEvents.subscribe((obj) => {
-			if (obj.key === TIMELINE_BOUNDING_CHANGED) {
-				const bounding = obj.value?.payload?.bounding;
-				if (bounding) {
-					setSize({
-						width: bounding.width,
-						height: bounding.height,
-					});
+		const sub = subject
+			.pipe(filter(({ key }) => key.startsWith(TIMELINE_PREFIX)))
+			.subscribe((obj) => {
+				if (obj.key === TIMELINE_BOUNDING_CHANGED) {
+					const b = obj.value?.payload?.bounding;
+					if (b) setScrollSize({ width: b.width, height: b.height });
 				}
-			}
-		});
-		return () => {
-			subscription.unsubscribe();
-		};
+			});
+		return () => sub.unsubscribe();
 	}, []);
 
-	const handleReplaceItem = (trackItem: Partial<ITrackItem>) => {
-		if (!trackItem.id) return;
-
-		dispatch(REPLACE_MEDIA, {
-			payload: {
-				[trackItem.id]: {
-					details: {
-						src: "https://cdn.designcombo.dev/videos/demo-video-4.mp4",
-					},
-				},
-			},
-		});
+	// ── Scrollbar event handlers ─────────────────────────────────────────────────
+	const handleScrollH = (e: React.UIEvent<HTMLDivElement>) => {
+		const sl = e.currentTarget.scrollLeft;
+		engineRef.current?.scrollTo({ scrollLeft: sl });
+		setScrollLeft(sl);
 	};
 
+	const handleScrollV = (e: React.UIEvent<HTMLDivElement>) => {
+		const st = e.currentTarget.scrollTop;
+		engineRef.current?.scrollTo({ scrollTop: st });
+		setScrollTop(st);
+	};
+
+	// ── Ruler ─────────────────────────────────────────────────────────────────────
 	const onClickRuler = (units: number) => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-
-		const time = unitsToTimeMs(units, scale.zoom);
-		playerRef?.current?.seekTo(Math.round((time * fps) / 1000));
+		const timeMs = unitsToTimeMs(units, scale.zoom);
+		playerRef?.current?.seekTo(Math.round((timeMs * fps) / 1000));
 	};
 
-	const onRulerScroll = (newScrollLeft: number) => {
-		// Update the timeline canvas scroll position
-		const canvas = canvasRef.current;
-		if (canvas) {
-			canvas.scrollTo({ scrollLeft: newScrollLeft });
-		}
-
-		// Update the horizontal scrollbar position
-		if (horizontalScrollbarVpRef.current) {
-			horizontalScrollbarVpRef.current.scrollLeft = newScrollLeft;
-		}
-
-		// Update the local scroll state
-		setScrollLeft(newScrollLeft);
+	const onRulerScroll = (newLeft: number) => {
+		engineRef.current?.scrollTo({ scrollLeft: newLeft });
+		if (horizontalScrollbarVpRef.current)
+			horizontalScrollbarVpRef.current.scrollLeft = newLeft;
+		setScrollLeft(newLeft);
 	};
 
-	useEffect(() => {
-		const availableScroll = horizontalScrollbarVpRef.current?.scrollWidth;
-		if (!availableScroll || !timeline) return;
-		const canvasWidth = timeline.width;
-		if (availableScroll < canvasWidth + scrollLeft) {
-			timeline.scrollTo({ scrollLeft: availableScroll - canvasWidth });
-		}
-	}, [scale]);
+	// ── Track meta → engine ───────────────────────────────────────────────────────
+	const handleTrackMetaChange = useCallback(
+		(trackId: string, patch: { locked?: boolean; muted?: boolean; solo?: boolean }) => {
+			engineRef.current?.setTrackMeta(trackId, patch);
+		},
+		[],
+	);
 
 	return (
 		<div
 			ref={timelineContainerRef}
-			id={"timeline-container"}
-			className="bg-muted/50 relative h-full w-full overflow-hidden"
+			id="timeline-container"
+			className="bg-background relative h-full w-full overflow-hidden flex flex-col"
 		>
+			{/* Header */}
 			<Header />
-			<Ruler
-				onClick={onClickRuler}
-				scrollLeft={scrollLeft}
-				onScroll={onRulerScroll}
-			/>
-			<Playhead scrollLeft={scrollLeft} />
-			<div className="flex">
+
+			{/* Ruler */}
+			<Ruler onClick={onClickRuler} scrollLeft={scrollLeft} onScroll={onRulerScroll} />
+
+			{/* Track area */}
+			<div className="flex flex-1 overflow-hidden">
+				{/* Track labels — left column, clips overflow, mirrors canvas scroll via translateY */}
 				<div
 					id="track-labels-container"
-					style={{
-						width: timelineOffsetX,
-						height: canvasSize.height,
-						overflow: "hidden",
-					}}
-					className="relative flex-none bg-background/95 border-r border-border/40"
+					style={{ width: timelineOffsetX, flexShrink: 0, overflow: "hidden" }}
+					className="bg-background/95 border-r border-border/40 relative"
 				>
-					<TrackLabels />
+					<TrackLabels
+						scrollTop={scrollTop}
+						onTrackMetaChange={handleTrackMetaChange}
+					/>
 				</div>
-				<div style={{ height: canvasSize.height }} className="relative flex-1">
-					<div
-						style={{ height: canvasSize.height }}
-						ref={containerRef}
-						className="absolute top-0 w-full"
-					>
-						<canvas id="designcombo-timeline-canvas" ref={canvasElRef} />
-					</div>
+
+				{/* Canvas + scrollbars */}
+				<div ref={canvasContainerRef} className="relative flex-1 overflow-hidden">
+					<canvas
+						id="designcombo-timeline-canvas"
+						ref={canvasElRef}
+						style={{ display: "block", position: "absolute", top: 0, left: 0 }}
+					/>
+
+					{/* Horizontal scrollbar */}
 					<ScrollArea.Root
 						type="always"
-						style={{
-							position: "absolute",
-							width: "calc(100vw - 40px)",
-							height: "10px",
-						}}
+						style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 10 }}
 						className="ScrollAreaRootH"
-						onPointerDown={() => {
-							canScrollRef.current = true;
-						}}
-						onPointerUp={() => {
-							canScrollRef.current = false;
-						}}
 					>
 						<ScrollArea.Viewport
-							onScroll={handleOnScrollH}
+							ref={horizontalScrollbarVpRef}
+							onScroll={handleScrollH}
 							className="ScrollAreaViewport"
 							id="viewportH"
-							ref={horizontalScrollbarVpRef}
 						>
 							<div
 								style={{
-									width:
-										size.width > canvasSize.width
-											? size.width + TIMELINE_OFFSET_CANVAS_RIGHT
-											: size.width,
+									width: Math.max(scrollSize.width, canvasSize.width) + TIMELINE_OFFSET_CANVAS_RIGHT,
+									height: 1,
 								}}
-								className="pointer-events-none h-[10px]"
 							/>
 						</ScrollArea.Viewport>
-
-						<ScrollArea.Scrollbar
-							className="ScrollAreaScrollbar"
-							orientation="horizontal"
-						>
-							<ScrollArea.Thumb
-								onMouseDown={() => {
-									canScrollRef.current = true;
-								}}
-								onMouseUp={() => {
-									canScrollRef.current = false;
-								}}
-								className="ScrollAreaThumb"
-							/>
+						<ScrollArea.Scrollbar className="ScrollAreaScrollbar" orientation="horizontal">
+							<ScrollArea.Thumb className="ScrollAreaThumb" />
 						</ScrollArea.Scrollbar>
 					</ScrollArea.Root>
 
+					{/* Vertical scrollbar */}
 					<ScrollArea.Root
 						type="always"
-						style={{
-							position: "absolute",
-							height: canvasSize.height,
-							width: "10px",
-						}}
+						style={{ position: "absolute", top: 0, right: 0, bottom: 10, width: 10 }}
 						className="ScrollAreaRootV"
 					>
 						<ScrollArea.Viewport
-							onScroll={handleOnScrollV}
-							className="ScrollAreaViewport"
 							ref={verticalScrollbarVpRef}
+							onScroll={handleScrollV}
+							className="ScrollAreaViewport"
 						>
 							<div
 								style={{
-									height:
-										size.height > canvasSize.height
-											? size.height + 40
-											: canvasSize.height,
+									height: Math.max(scrollSize.height, canvasSize.height) + 40,
+									width: 1,
 								}}
-								className="pointer-events-none w-[10px]"
 							/>
 						</ScrollArea.Viewport>
-						<ScrollArea.Scrollbar
-							className="ScrollAreaScrollbar"
-							orientation="vertical"
-						>
-							<ScrollArea.Thumb
-								onMouseDown={() => {
-									canScrollRef.current = true;
-								}}
-								onMouseUp={() => {
-									canScrollRef.current = false;
-								}}
-								className="ScrollAreaThumb"
-							/>
+						<ScrollArea.Scrollbar className="ScrollAreaScrollbar" orientation="vertical">
+							<ScrollArea.Thumb className="ScrollAreaThumb" />
 						</ScrollArea.Scrollbar>
 					</ScrollArea.Root>
 				</div>

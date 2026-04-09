@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
 				"User-Agent": "Mozilla/5.0 (compatible; ReactVideoEditor/1.0)",
 			},
 			next: { revalidate: 3600 }, // Cache for 1 hour
+			signal: AbortSignal.timeout(15_000),
 		});
 
 		if (!response.ok) {

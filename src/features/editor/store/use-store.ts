@@ -1,4 +1,5 @@
-import Timeline from "@designcombo/timeline";
+// CanvasEngine replaces @designcombo/timeline — accept any shape
+type Timeline = any;
 import {
 	IComposition,
 	ISize,
@@ -45,6 +46,19 @@ interface ITimelineStore {
 	};
 	viewTimeline: boolean;
 	setViewTimeline: (viewTimeline: boolean) => void;
+
+	/** Track IDs where mute is active */
+	mutedTrackIds: string[];
+	setMutedTrackIds: (ids: string[]) => void;
+	/** Track IDs where solo is active */
+	soloTrackIds: string[];
+	setSoloTrackIds: (ids: string[]) => void;
+	/** Track IDs that are locked — blocks interaction on canvas and editing */
+	lockedTrackIds: string[];
+	setLockedTrackIds: (ids: string[]) => void;
+	/** Timeline markers */
+	markers: { id: string; timeMs: number; label: string; color: string }[];
+	setMarkers: (markers: { id: string; timeMs: number; label: string; color: string }[]) => void;
 }
 
 const useStore = create<ITimelineStore>((set) => ({
@@ -106,6 +120,15 @@ const useStore = create<ITimelineStore>((set) => ({
 	setPlayerRef: (playerRef: React.RefObject<PlayerRef> | null) =>
 		set({ playerRef }),
 	setSceneMoveableRef: (ref) => set({ sceneMoveableRef: ref }),
+
+	mutedTrackIds: [],
+	setMutedTrackIds: (ids) => set({ mutedTrackIds: ids }),
+	soloTrackIds: [],
+	setSoloTrackIds: (ids) => set({ soloTrackIds: ids }),
+	lockedTrackIds: [],
+	setLockedTrackIds: (ids) => set({ lockedTrackIds: ids }),
+	markers: [],
+	setMarkers: (markers) => set({ markers }),
 }));
 
 export default useStore;
