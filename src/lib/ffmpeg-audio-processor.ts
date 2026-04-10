@@ -112,13 +112,18 @@ function buildFfmpegAudioFilter(effects: AudioEffectsPayload): string {
 	// 3. Delay (aecho: in_gain:out_gain:delays_ms:decays)
 	if (effects.delay?.active) {
 		const time = Math.max(1, effects.delay.time ?? 0);
-		const feedback = Math.max(0, Math.min((effects.delay.feedback ?? 0) / 100, 0.95));
+		const feedback = Math.max(
+			0,
+			Math.min((effects.delay.feedback ?? 0) / 100, 0.95),
+		);
 		const mix = Math.max(0, Math.min((effects.delay.mix ?? 0) / 100, 1.0));
 
 		if (time > 0 && mix > 0) {
 			const inGain = Math.max(0.1, 1.0 - mix * 0.5);
 			const outGain = mix;
-			filters.push(`aecho=${inGain.toFixed(3)}:${outGain.toFixed(3)}:${time}:${feedback.toFixed(3)}`);
+			filters.push(
+				`aecho=${inGain.toFixed(3)}:${outGain.toFixed(3)}:${time}:${feedback.toFixed(3)}`,
+			);
 		}
 	}
 
@@ -131,7 +136,9 @@ function buildFfmpegAudioFilter(effects: AudioEffectsPayload): string {
 			const inGain = Math.max(0.1, 1.0 - mix * 0.5);
 			const tap1 = Math.round(size * 1.5);
 			const tap2 = Math.round(size * 2.2);
-			filters.push(`aecho=${inGain.toFixed(3)}:${mix.toFixed(3)}:${tap1}|${tap2}:0.4|0.3`);
+			filters.push(
+				`aecho=${inGain.toFixed(3)}:${mix.toFixed(3)}:${tap1}|${tap2}:0.4|0.3`,
+			);
 		}
 	}
 

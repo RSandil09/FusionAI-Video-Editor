@@ -144,7 +144,10 @@ export async function POST(request: NextRequest) {
 		// 4. Fetch video and convert to base64
 		let videoResponse: Response;
 		try {
-			videoResponse = await fetch(fetchUrl, { headers: fetchHeaders, signal: AbortSignal.timeout(120_000) });
+			videoResponse = await fetch(fetchUrl, {
+				headers: fetchHeaders,
+				signal: AbortSignal.timeout(120_000),
+			});
 		} catch (fetchError) {
 			const msg =
 				fetchError instanceof Error ? fetchError.message : "Unknown error";

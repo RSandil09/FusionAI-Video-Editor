@@ -36,7 +36,9 @@ class EditorErrorBoundary extends Component<
 			return (
 				<div className="flex items-center justify-center h-screen bg-background">
 					<div className="text-center max-w-md px-6">
-						<h2 className="text-2xl font-semibold mb-2 text-destructive">Editor crashed</h2>
+						<h2 className="text-2xl font-semibold mb-2 text-destructive">
+							Editor crashed
+						</h2>
 						<p className="text-muted-foreground mb-2 text-sm">
 							Something went wrong while rendering the editor.
 						</p>

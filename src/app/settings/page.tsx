@@ -28,11 +28,20 @@ import {
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { useTheme, useApplyRemoteTheme, type Theme } from "@/components/theme-provider";
+import {
+	useTheme,
+	useApplyRemoteTheme,
+	type Theme,
+} from "@/components/theme-provider";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type TabId = "profile" | "connections" | "notifications" | "export" | "appearance";
+type TabId =
+	| "profile"
+	| "connections"
+	| "notifications"
+	| "export"
+	| "appearance";
 
 interface UserSettings {
 	theme: string;
@@ -110,19 +119,32 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function SectionCard({ children, className }: { children: React.ReactNode; className?: string }) {
+function SectionCard({
+	children,
+	className,
+}: { children: React.ReactNode; className?: string }) {
 	return (
-		<div className={cn("rounded-xl border border-white/8 bg-[#161616] overflow-hidden", className)}>
+		<div
+			className={cn(
+				"rounded-xl border border-white/8 bg-[#161616] overflow-hidden",
+				className,
+			)}
+		>
 			{children}
 		</div>
 	);
 }
 
-function SectionHeader({ title, description }: { title: string; description?: string }) {
+function SectionHeader({
+	title,
+	description,
+}: { title: string; description?: string }) {
 	return (
 		<div className="px-5 py-4 border-b border-white/8">
 			<h3 className="text-sm font-semibold text-white">{title}</h3>
-			{description && <p className="text-xs text-[#707070] mt-0.5">{description}</p>}
+			{description && (
+				<p className="text-xs text-[#707070] mt-0.5">{description}</p>
+			)}
 		</div>
 	);
 }
@@ -139,10 +161,19 @@ function SettingRow({
 	last?: boolean;
 }) {
 	return (
-		<div className={cn("flex items-center justify-between px-5 py-4 gap-4", !last && "border-b border-white/5")}>
+		<div
+			className={cn(
+				"flex items-center justify-between px-5 py-4 gap-4",
+				!last && "border-b border-white/5",
+			)}
+		>
 			<div className="min-w-0">
 				<p className="text-sm font-medium text-white">{label}</p>
-				{description && <p className="text-xs text-[#707070] mt-0.5 leading-relaxed">{description}</p>}
+				{description && (
+					<p className="text-xs text-[#707070] mt-0.5 leading-relaxed">
+						{description}
+					</p>
+				)}
 			</div>
 			<div className="shrink-0">{children}</div>
 		</div>
@@ -198,7 +229,13 @@ function SettingsContent() {
 	const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
 	useEffect(() => {
-		const valid: TabId[] = ["profile", "connections", "notifications", "export", "appearance"];
+		const valid: TabId[] = [
+			"profile",
+			"connections",
+			"notifications",
+			"export",
+			"appearance",
+		];
 		if (tabParam && valid.includes(tabParam)) setActiveTab(tabParam);
 	}, [tabParam]);
 
@@ -206,7 +243,8 @@ function SettingsContent() {
 		const error = searchParams.get("error");
 		const youtube = searchParams.get("youtube");
 		if (error) toast.error(`Connection failed: ${error.replace(/_/g, " ")}`);
-		if (youtube === "connected") toast.success("YouTube connected successfully!");
+		if (youtube === "connected")
+			toast.success("YouTube connected successfully!");
 	}, [searchParams]);
 
 	useEffect(() => {
@@ -220,8 +258,12 @@ function SettingsContent() {
 		if (!token) return;
 		try {
 			const [settingsRes, connectionsRes] = await Promise.all([
-				fetch("/api/settings", { headers: { Authorization: `Bearer ${token}` } }),
-				fetch("/api/social-connections", { headers: { Authorization: `Bearer ${token}` } }),
+				fetch("/api/settings", {
+					headers: { Authorization: `Bearer ${token}` },
+				}),
+				fetch("/api/social-connections", {
+					headers: { Authorization: `Bearer ${token}` },
+				}),
 			]);
 			if (settingsRes.ok) {
 				const data = await settingsRes.json();
@@ -245,7 +287,10 @@ function SettingsContent() {
 		try {
 			const res = await fetch("/api/settings", {
 				method: "PATCH",
-				headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
 				body: JSON.stringify(updates),
 			});
 			if (res.ok) {
@@ -286,7 +331,8 @@ function SettingsContent() {
 	}
 
 	const isConnected = (p: string) => connections.some((c) => c.provider === p);
-	const getConnection = (p: string) => connections.find((c) => c.provider === p);
+	const getConnection = (p: string) =>
+		connections.find((c) => c.provider === p);
 
 	if (loading) {
 		return (
@@ -313,8 +359,12 @@ function SettingsContent() {
 						<ArrowLeft className="h-4 w-4 text-[#a0a0a0]" />
 					</Link>
 					<div>
-						<h1 className="text-2xl font-bold tracking-tight text-white">Settings</h1>
-						<p className="text-sm text-[#707070]">Manage your account, channels, and preferences</p>
+						<h1 className="text-2xl font-bold tracking-tight text-white">
+							Settings
+						</h1>
+						<p className="text-sm text-[#707070]">
+							Manage your account, channels, and preferences
+						</p>
 					</div>
 					{saving && (
 						<div className="ml-auto flex items-center gap-2 text-xs text-[#707070]">
@@ -367,20 +417,26 @@ function SettingsContent() {
 
 					{/* Panel */}
 					<div className="flex-1 min-w-0 space-y-4">
-
 						{/* ── Profile ── */}
 						{activeTab === "profile" && (
 							<div className="space-y-4">
 								<SectionCard>
-									<SectionHeader title="Account" description="Your Fusion account details" />
+									<SectionHeader
+										title="Account"
+										description="Your Fusion account details"
+									/>
 									<div className="p-5 flex items-center gap-4">
 										<div className="h-14 w-14 rounded-full bg-[#ff6a00]/15 border border-[#ff6a00]/20 flex items-center justify-center shrink-0">
 											<span className="text-xl font-bold text-[#ff6a00]">
-												{(user?.displayName || user?.email || "U")[0].toUpperCase()}
+												{(user?.displayName ||
+													user?.email ||
+													"U")[0].toUpperCase()}
 											</span>
 										</div>
 										<div>
-											<p className="font-semibold text-white">{user?.displayName || "No display name"}</p>
+											<p className="font-semibold text-white">
+												{user?.displayName || "No display name"}
+											</p>
 											<p className="text-sm text-[#707070]">{user?.email}</p>
 										</div>
 									</div>
@@ -388,14 +444,19 @@ function SettingsContent() {
 
 								<SectionCard>
 									<SectionHeader title="Account Details" />
-									<SettingRow label="Email" description="Your login email address">
+									<SettingRow
+										label="Email"
+										description="Your login email address"
+									>
 										<span className="text-sm text-[#a0a0a0] font-mono bg-white/5 px-2.5 py-1 rounded-md">
 											{user?.email}
 										</span>
 									</SettingRow>
 									<SettingRow label="Display Name" last>
 										<span className="text-sm text-[#a0a0a0]">
-											{user?.displayName || <span className="italic text-[#606060]">Not set</span>}
+											{user?.displayName || (
+												<span className="italic text-[#606060]">Not set</span>
+											)}
 										</span>
 									</SettingRow>
 								</SectionCard>
@@ -403,7 +464,8 @@ function SettingsContent() {
 								<div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-white/8 bg-white/2">
 									<AlertCircle className="h-4 w-4 text-[#707070] shrink-0 mt-0.5" />
 									<p className="text-xs text-[#707070] leading-relaxed">
-										Profile name and photo are managed through Firebase Auth. Contact support to update your display name.
+										Profile name and photo are managed through Firebase Auth.
+										Contact support to update your display name.
 									</p>
 								</div>
 							</div>
@@ -418,68 +480,96 @@ function SettingsContent() {
 										description="Connect your accounts to publish videos without leaving the editor"
 									/>
 									<div className="divide-y divide-white/5">
-										{platforms.map(({ id, name, description, ready, icon, iconBg, iconColor, badge }) => {
-											const connected = isConnected(id);
-											const conn = getConnection(id);
-											const isDisconnecting = disconnecting === id;
+										{platforms.map(
+											({
+												id,
+												name,
+												description,
+												ready,
+												icon,
+												iconBg,
+												iconColor,
+												badge,
+											}) => {
+												const connected = isConnected(id);
+												const conn = getConnection(id);
+												const isDisconnecting = disconnecting === id;
 
-											return (
-												<div key={id} className="flex items-center gap-4 px-5 py-4">
-													{/* Icon */}
-													<div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", iconBg, iconColor)}>
-														{icon}
-													</div>
-
-													{/* Info */}
-													<div className="flex-1 min-w-0">
-														<div className="flex items-center gap-2 flex-wrap">
-															<span className="text-sm font-semibold text-white">{name}</span>
-															{badge && (
-																<span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white/6 text-[#707070] border border-white/8">
-																	{badge}
-																</span>
+												return (
+													<div
+														key={id}
+														className="flex items-center gap-4 px-5 py-4"
+													>
+														{/* Icon */}
+														<div
+															className={cn(
+																"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+																iconBg,
+																iconColor,
 															)}
-															{connected && (
-																<div className="flex items-center gap-1 text-emerald-400">
-																	<div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-																	<span className="text-[10px] font-medium">Active</span>
-																</div>
-															)}
+														>
+															{icon}
 														</div>
-														<p className="text-xs text-[#606070] mt-0.5">
-															{connected && conn?.provider_username
-																? `@${conn.provider_username}`
-																: description}
-														</p>
-													</div>
 
-													{/* Action */}
-													{connected ? (
-														<button
-															onClick={() => disconnectProvider(id)}
-															disabled={isDisconnecting}
-															className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 text-[#a0a0a0] hover:border-red-500/40 hover:text-red-400 hover:bg-red-500/5 transition-all duration-150 disabled:opacity-50"
-														>
-															{isDisconnecting ? (
-																<Loader2 className="h-3.5 w-3.5 animate-spin" />
-															) : (
-																<Unplug className="h-3.5 w-3.5" />
-															)}
-															Disconnect
-														</button>
-													) : ready ? (
-														<button
-															onClick={() => (window.location.href = `/api/social-connections/${id}/connect`)}
-															className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#ff6a00] hover:bg-[#ff7a1a] text-white transition-all duration-150 shadow-sm shadow-[#ff6a00]/20 hover:shadow-[#ff6a00]/30"
-														>
-															Connect
-														</button>
-													) : (
-														<span className="text-xs text-[#505050] font-medium">Soon</span>
-													)}
-												</div>
-											);
-										})}
+														{/* Info */}
+														<div className="flex-1 min-w-0">
+															<div className="flex items-center gap-2 flex-wrap">
+																<span className="text-sm font-semibold text-white">
+																	{name}
+																</span>
+																{badge && (
+																	<span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white/6 text-[#707070] border border-white/8">
+																		{badge}
+																	</span>
+																)}
+																{connected && (
+																	<div className="flex items-center gap-1 text-emerald-400">
+																		<div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+																		<span className="text-[10px] font-medium">
+																			Active
+																		</span>
+																	</div>
+																)}
+															</div>
+															<p className="text-xs text-[#606070] mt-0.5">
+																{connected && conn?.provider_username
+																	? `@${conn.provider_username}`
+																	: description}
+															</p>
+														</div>
+
+														{/* Action */}
+														{connected ? (
+															<button
+																onClick={() => disconnectProvider(id)}
+																disabled={isDisconnecting}
+																className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 text-[#a0a0a0] hover:border-red-500/40 hover:text-red-400 hover:bg-red-500/5 transition-all duration-150 disabled:opacity-50"
+															>
+																{isDisconnecting ? (
+																	<Loader2 className="h-3.5 w-3.5 animate-spin" />
+																) : (
+																	<Unplug className="h-3.5 w-3.5" />
+																)}
+																Disconnect
+															</button>
+														) : ready ? (
+															<button
+																onClick={() =>
+																	(window.location.href = `/api/social-connections/${id}/connect`)
+																}
+																className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#ff6a00] hover:bg-[#ff7a1a] text-white transition-all duration-150 shadow-sm shadow-[#ff6a00]/20 hover:shadow-[#ff6a00]/30"
+															>
+																Connect
+															</button>
+														) : (
+															<span className="text-xs text-[#505050] font-medium">
+																Soon
+															</span>
+														)}
+													</div>
+												);
+											},
+										)}
 									</div>
 								</SectionCard>
 
@@ -487,7 +577,12 @@ function SettingsContent() {
 								<div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-[#ff6a00]/15 bg-[#ff6a00]/5">
 									<Zap className="h-4 w-4 text-[#ff6a00] shrink-0 mt-0.5" />
 									<p className="text-xs text-[#a0a0a0] leading-relaxed">
-										After connecting, use the <span className="font-semibold text-[#ff6a00]">Publish</span> button in the editor to send your video directly to any connected channel.
+										After connecting, use the{" "}
+										<span className="font-semibold text-[#ff6a00]">
+											Publish
+										</span>{" "}
+										button in the editor to send your video directly to any
+										connected channel.
 									</p>
 								</div>
 							</div>
@@ -506,7 +601,9 @@ function SettingsContent() {
 								>
 									<Switch
 										checked={settings.email_notifications}
-										onCheckedChange={(v) => updateSettings({ email_notifications: v })}
+										onCheckedChange={(v) =>
+											updateSettings({ email_notifications: v })
+										}
 									/>
 								</SettingRow>
 								<SettingRow
@@ -516,7 +613,9 @@ function SettingsContent() {
 								>
 									<Switch
 										checked={settings.render_complete_notifications}
-										onCheckedChange={(v) => updateSettings({ render_complete_notifications: v })}
+										onCheckedChange={(v) =>
+											updateSettings({ render_complete_notifications: v })
+										}
 									/>
 								</SettingRow>
 							</SectionCard>
@@ -530,10 +629,15 @@ function SettingsContent() {
 										title="Export Defaults"
 										description="These settings apply to every new export"
 									/>
-									<SettingRow label="Default quality" description="Resolution and bitrate of exported video">
+									<SettingRow
+										label="Default quality"
+										description="Resolution and bitrate of exported video"
+									>
 										<StyledSelect
 											value={settings.default_export_quality}
-											onChange={(v) => updateSettings({ default_export_quality: v })}
+											onChange={(v) =>
+												updateSettings({ default_export_quality: v })
+											}
 											options={[
 												{ value: "low", label: "Low — fast, smaller file" },
 												{ value: "medium", label: "Medium — balanced" },
@@ -541,10 +645,16 @@ function SettingsContent() {
 											]}
 										/>
 									</SettingRow>
-									<SettingRow label="Default format" description="Container format for exported video" last>
+									<SettingRow
+										label="Default format"
+										description="Container format for exported video"
+										last
+									>
 										<StyledSelect
 											value={settings.default_export_format}
-											onChange={(v) => updateSettings({ default_export_format: v })}
+											onChange={(v) =>
+												updateSettings({ default_export_format: v })
+											}
 											options={[{ value: "mp4", label: "MP4 (H.264)" }]}
 										/>
 									</SettingRow>
@@ -556,14 +666,25 @@ function SettingsContent() {
 						{activeTab === "appearance" && settings && (
 							<div className="space-y-4">
 								<SectionCard>
-									<SectionHeader title="Theme" description="Choose how Fusion looks on your device" />
+									<SectionHeader
+										title="Theme"
+										description="Choose how Fusion looks on your device"
+									/>
 									<div className="p-5 grid grid-cols-3 gap-3">
 										{(
 											[
 												{ value: "light" as Theme, label: "Light", icon: Sun },
 												{ value: "dark" as Theme, label: "Dark", icon: Moon },
-												{ value: "system" as Theme, label: "System", icon: Monitor },
-											] as { value: Theme; label: string; icon: React.ElementType }[]
+												{
+													value: "system" as Theme,
+													label: "System",
+													icon: Monitor,
+												},
+											] as {
+												value: Theme;
+												label: string;
+												icon: React.ElementType;
+											}[]
 										).map(({ value, label, icon: Icon }) => (
 											<button
 												key={value}
@@ -591,7 +712,6 @@ function SettingsContent() {
 								</SectionCard>
 							</div>
 						)}
-
 					</div>
 				</div>
 			</main>

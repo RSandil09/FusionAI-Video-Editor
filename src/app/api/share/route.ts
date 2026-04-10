@@ -57,7 +57,10 @@ export async function POST(request: NextRequest) {
 			try {
 				parsedVideoUrl = new URL(videoUrl);
 			} catch {
-				return NextResponse.json({ error: "Invalid videoUrl" }, { status: 400 });
+				return NextResponse.json(
+					{ error: "Invalid videoUrl" },
+					{ status: 400 },
+				);
 			}
 			if (!parsedVideoUrl.hostname.endsWith(".r2.dev")) {
 				return NextResponse.json(

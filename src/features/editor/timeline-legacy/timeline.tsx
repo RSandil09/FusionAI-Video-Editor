@@ -92,8 +92,12 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 	useEffect(() => {
 		const player = playerRef?.current;
 		if (!player) return;
-		const onPlay = () => { canScrollRef.current = true; };
-		const onPause = () => { canScrollRef.current = false; };
+		const onPlay = () => {
+			canScrollRef.current = true;
+		};
+		const onPause = () => {
+			canScrollRef.current = false;
+		};
 		player.addEventListener("play", onPlay);
 		player.addEventListener("pause", onPause);
 		return () => {

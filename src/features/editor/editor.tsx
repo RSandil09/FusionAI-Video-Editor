@@ -84,7 +84,6 @@ const Editor = ({
 	// Load editor state from initialState prop or create empty state
 	useEffect(() => {
 		try {
-
 			let editorState;
 
 			if (initialState && typeof initialState === "object") {
@@ -127,14 +126,25 @@ const Editor = ({
 
 			// Restore Zustand-only state persisted alongside the editor state.
 			// Filter out orphaned track IDs (tracks that no longer exist in the state).
-			const { setMarkers, setLockedTrackIds, setMutedTrackIds, setSoloTrackIds } = useStore.getState();
+			const {
+				setMarkers,
+				setLockedTrackIds,
+				setMutedTrackIds,
+				setSoloTrackIds,
+			} = useStore.getState();
 			const s = editorState as any;
-			const existingTrackIds = new Set<string>((s.tracks ?? []).map((t: any) => t.id as string));
-			const filterTrackIds = (ids: string[]) => ids.filter((id) => existingTrackIds.has(id));
-			if (Array.isArray(s.markers))        setMarkers(s.markers);
-			if (Array.isArray(s.lockedTrackIds)) setLockedTrackIds(filterTrackIds(s.lockedTrackIds));
-			if (Array.isArray(s.mutedTrackIds))  setMutedTrackIds(filterTrackIds(s.mutedTrackIds));
-			if (Array.isArray(s.soloTrackIds))   setSoloTrackIds(filterTrackIds(s.soloTrackIds));
+			const existingTrackIds = new Set<string>(
+				(s.tracks ?? []).map((t: any) => t.id as string),
+			);
+			const filterTrackIds = (ids: string[]) =>
+				ids.filter((id) => existingTrackIds.has(id));
+			if (Array.isArray(s.markers)) setMarkers(s.markers);
+			if (Array.isArray(s.lockedTrackIds))
+				setLockedTrackIds(filterTrackIds(s.lockedTrackIds));
+			if (Array.isArray(s.mutedTrackIds))
+				setMutedTrackIds(filterTrackIds(s.mutedTrackIds));
+			if (Array.isArray(s.soloTrackIds))
+				setSoloTrackIds(filterTrackIds(s.soloTrackIds));
 		} catch (error) {
 			const msg = error instanceof Error ? error.message : String(error);
 			console.error("❌ Failed to load editor state:", msg);
@@ -176,14 +186,23 @@ const Editor = ({
 
 					const token = await getIdToken();
 					if (!token) {
-						console.warn("Auto-save skipped: no auth token (session may have expired)");
+						console.warn(
+							"Auto-save skipped: no auth token (session may have expired)",
+						);
 						setSaveStatus("error");
 						return;
 					}
 
 					// Merge Zustand-only fields that stateManager.toJSON() doesn't include
-					const { markers, lockedTrackIds, mutedTrackIds, soloTrackIds } = useStore.getState();
-					const fullState = { ...editorState, markers, lockedTrackIds, mutedTrackIds, soloTrackIds };
+					const { markers, lockedTrackIds, mutedTrackIds, soloTrackIds } =
+						useStore.getState();
+					const fullState = {
+						...editorState,
+						markers,
+						lockedTrackIds,
+						mutedTrackIds,
+						soloTrackIds,
+					};
 
 					setSaveStatus("saving");
 					const res = await fetch(`/api/projects/${projectId}`, {
@@ -271,7 +290,8 @@ const Editor = ({
 			if (trackItem) {
 				setTrackItem(trackItem);
 				setLayoutTrackItem(trackItem);
-			} else {}
+			} else {
+			}
 		} else {
 			setTrackItem(null);
 			setLayoutTrackItem(null);

@@ -86,7 +86,9 @@ const BasicText = ({
 		setTextContent((trackItem.details as any).text || "");
 	}, [(trackItem.details as any).text]);
 
-	const handleTextContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+	const handleTextContentChange = (
+		e: React.ChangeEvent<HTMLTextAreaElement>,
+	) => {
 		const v = e.target.value;
 		setTextContent(v);
 		dispatch(EDIT_OBJECT, {
@@ -362,7 +364,9 @@ const BasicText = ({
 			key: "textContent",
 			component: (
 				<div className="flex flex-col gap-1.5">
-					<label className="text-xs text-muted-foreground font-medium">Text</label>
+					<label className="text-xs text-muted-foreground font-medium">
+						Text
+					</label>
 					<Textarea
 						value={textContent}
 						onChange={handleTextContentChange}

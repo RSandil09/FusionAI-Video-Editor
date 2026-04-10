@@ -4,7 +4,10 @@ import Ruler from "./ruler";
 import { timeMsToUnits, unitsToTimeMs } from "./engine/types";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { filter, subject } from "@designcombo/events";
-import { TIMELINE_BOUNDING_CHANGED, TIMELINE_PREFIX } from "@designcombo/timeline";
+import {
+	TIMELINE_BOUNDING_CHANGED,
+	TIMELINE_PREFIX,
+} from "@designcombo/timeline";
 import useStore from "../store/use-store";
 import { useCurrentPlayerFrame } from "../hooks/use-current-frame";
 import StateManager from "@designcombo/state";
@@ -47,10 +50,18 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 	const [scrollSize, setScrollSize] = useState({ width: 0, height: 0 });
 
 	const {
-		scale, playerRef, fps, duration,
-		tracks, trackItemsMap, transitionsMap,
-		activeIds, setTimeline,
-		lockedTrackIds, mutedTrackIds, soloTrackIds,
+		scale,
+		playerRef,
+		fps,
+		duration,
+		tracks,
+		trackItemsMap,
+		transitionsMap,
+		activeIds,
+		setTimeline,
+		lockedTrackIds,
+		mutedTrackIds,
+		soloTrackIds,
 		markers,
 	} = useStore();
 
@@ -58,22 +69,28 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 	const timelineOffsetX = useTimelineOffsetX();
 
 	// ── Engine scroll callback — updates both scrollbars and track labels ────────
-	const onScroll = useCallback((v: { scrollTop?: number; scrollLeft?: number }) => {
-		if (v.scrollLeft !== undefined) {
-			if (horizontalScrollbarVpRef.current)
-				horizontalScrollbarVpRef.current.scrollLeft = v.scrollLeft;
-			setScrollLeft(v.scrollLeft);
-		}
-		if (v.scrollTop !== undefined) {
-			if (verticalScrollbarVpRef.current)
-				verticalScrollbarVpRef.current.scrollTop = v.scrollTop;
-			setScrollTop(v.scrollTop);
-		}
-	}, []);
+	const onScroll = useCallback(
+		(v: { scrollTop?: number; scrollLeft?: number }) => {
+			if (v.scrollLeft !== undefined) {
+				if (horizontalScrollbarVpRef.current)
+					horizontalScrollbarVpRef.current.scrollLeft = v.scrollLeft;
+				setScrollLeft(v.scrollLeft);
+			}
+			if (v.scrollTop !== undefined) {
+				if (verticalScrollbarVpRef.current)
+					verticalScrollbarVpRef.current.scrollTop = v.scrollTop;
+				setScrollTop(v.scrollTop);
+			}
+		},
+		[],
+	);
 
-	const onResizeCanvas = useCallback((size: { width: number; height: number }) => {
-		setCanvasSize(size);
-	}, []);
+	const onResizeCanvas = useCallback(
+		(size: { width: number; height: number }) => {
+			setCanvasSize(size);
+		},
+		[],
+	);
 
 	// ── Mount engine once ────────────────────────────────────────────────────────
 	useEffect(() => {
@@ -96,13 +113,21 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		const containerWidth = Math.max(rect.width, 400);
 		const containerHeight = Math.max(rect.height, 200);
 
-		const callbacks = buildEngineCallbacks(stateManager, fps, playerRef, engineRef);
+		const callbacks = buildEngineCallbacks(
+			stateManager,
+			fps,
+			playerRef,
+			engineRef,
+		);
 
 		const eng = new CanvasEngine(canvasEl, {
 			canvas: canvasEl,
 			width: containerWidth,
 			height: containerHeight,
-			spacing: { left: TIMELINE_OFFSET_CANVAS_LEFT, right: TIMELINE_OFFSET_CANVAS_RIGHT },
+			spacing: {
+				left: TIMELINE_OFFSET_CANVAS_LEFT,
+				right: TIMELINE_OFFSET_CANVAS_RIGHT,
+			},
 			scale,
 			duration,
 			fps,
@@ -179,11 +204,20 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		for (const row of eng.getTrackRows()) {
 			eng.setTrackMeta(row.id, {
 				locked: lockedTrackIds.includes(row.id),
-				muted:  mutedTrackIds.includes(row.id),
-				solo:   soloTrackIds.includes(row.id),
+				muted: mutedTrackIds.includes(row.id),
+				solo: soloTrackIds.includes(row.id),
 			});
 		}
-	}, [tracks, trackItemsMap, transitionsMap, scale, duration, lockedTrackIds, mutedTrackIds, soloTrackIds]);
+	}, [
+		tracks,
+		trackItemsMap,
+		transitionsMap,
+		scale,
+		duration,
+		lockedTrackIds,
+		mutedTrackIds,
+		soloTrackIds,
+	]);
 
 	// ── Sync selection only — lightweight, no full rebuild ────────────────────────
 	useEffect(() => {
@@ -262,7 +296,10 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 
 	// ── Track meta → engine ───────────────────────────────────────────────────────
 	const handleTrackMetaChange = useCallback(
-		(trackId: string, patch: { locked?: boolean; muted?: boolean; solo?: boolean }) => {
+		(
+			trackId: string,
+			patch: { locked?: boolean; muted?: boolean; solo?: boolean },
+		) => {
 			engineRef.current?.setTrackMeta(trackId, patch);
 		},
 		[],
@@ -278,7 +315,11 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 			<Header />
 
 			{/* Ruler */}
-			<Ruler onClick={onClickRuler} scrollLeft={scrollLeft} onScroll={onRulerScroll} />
+			<Ruler
+				onClick={onClickRuler}
+				scrollLeft={scrollLeft}
+				onScroll={onRulerScroll}
+			/>
 
 			{/* Track area */}
 			<div className="flex flex-1 overflow-hidden">
@@ -295,7 +336,10 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 				</div>
 
 				{/* Canvas + scrollbars */}
-				<div ref={canvasContainerRef} className="relative flex-1 overflow-hidden">
+				<div
+					ref={canvasContainerRef}
+					className="relative flex-1 overflow-hidden"
+				>
 					<canvas
 						id="designcombo-timeline-canvas"
 						ref={canvasElRef}
@@ -305,7 +349,13 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 					{/* Horizontal scrollbar */}
 					<ScrollArea.Root
 						type="always"
-						style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 10 }}
+						style={{
+							position: "absolute",
+							bottom: 0,
+							left: 0,
+							right: 0,
+							height: 10,
+						}}
 						className="ScrollAreaRootH"
 					>
 						<ScrollArea.Viewport
@@ -316,12 +366,17 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 						>
 							<div
 								style={{
-									width: Math.max(scrollSize.width, canvasSize.width) + TIMELINE_OFFSET_CANVAS_RIGHT,
+									width:
+										Math.max(scrollSize.width, canvasSize.width) +
+										TIMELINE_OFFSET_CANVAS_RIGHT,
 									height: 1,
 								}}
 							/>
 						</ScrollArea.Viewport>
-						<ScrollArea.Scrollbar className="ScrollAreaScrollbar" orientation="horizontal">
+						<ScrollArea.Scrollbar
+							className="ScrollAreaScrollbar"
+							orientation="horizontal"
+						>
 							<ScrollArea.Thumb className="ScrollAreaThumb" />
 						</ScrollArea.Scrollbar>
 					</ScrollArea.Root>
@@ -329,7 +384,13 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 					{/* Vertical scrollbar */}
 					<ScrollArea.Root
 						type="always"
-						style={{ position: "absolute", top: 0, right: 0, bottom: 10, width: 10 }}
+						style={{
+							position: "absolute",
+							top: 0,
+							right: 0,
+							bottom: 10,
+							width: 10,
+						}}
 						className="ScrollAreaRootV"
 					>
 						<ScrollArea.Viewport
@@ -344,7 +405,10 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 								}}
 							/>
 						</ScrollArea.Viewport>
-						<ScrollArea.Scrollbar className="ScrollAreaScrollbar" orientation="vertical">
+						<ScrollArea.Scrollbar
+							className="ScrollAreaScrollbar"
+							orientation="vertical"
+						>
 							<ScrollArea.Thumb className="ScrollAreaThumb" />
 						</ScrollArea.Scrollbar>
 					</ScrollArea.Root>

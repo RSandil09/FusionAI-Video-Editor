@@ -18,7 +18,9 @@ function formatFileSize(bytes: number): string {
 	const k = 1024;
 	const sizes = ["B", "KB", "MB", "GB"];
 	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return (bytes / Math.pow(k, i)).toFixed(1).replace(/\.0$/, "") + " " + sizes[i];
+	return (
+		(bytes / Math.pow(k, i)).toFixed(1).replace(/\.0$/, "") + " " + sizes[i]
+	);
 }
 
 function formatDuration(seconds: number | null): string {
@@ -29,14 +31,35 @@ function formatDuration(seconds: number | null): string {
 }
 
 const typeConfig = {
-	video: { icon: Film, color: "text-blue-400", bg: "bg-blue-400/10", badge: "bg-blue-400/15 text-blue-300" },
-	image: { icon: ImageIcon, color: "text-emerald-400", bg: "bg-emerald-400/10", badge: "bg-emerald-400/15 text-emerald-300" },
-	audio: { icon: Music, color: "text-purple-400", bg: "bg-purple-400/10", badge: "bg-purple-400/15 text-purple-300" },
-	other: { icon: File, color: "text-[#707070]", bg: "bg-white/5", badge: "bg-white/8 text-[#a0a0a0]" },
+	video: {
+		icon: Film,
+		color: "text-blue-400",
+		bg: "bg-blue-400/10",
+		badge: "bg-blue-400/15 text-blue-300",
+	},
+	image: {
+		icon: ImageIcon,
+		color: "text-emerald-400",
+		bg: "bg-emerald-400/10",
+		badge: "bg-emerald-400/15 text-emerald-300",
+	},
+	audio: {
+		icon: Music,
+		color: "text-purple-400",
+		bg: "bg-purple-400/10",
+		badge: "bg-purple-400/15 text-purple-300",
+	},
+	other: {
+		icon: File,
+		color: "text-[#707070]",
+		bg: "bg-white/5",
+		badge: "bg-white/8 text-[#a0a0a0]",
+	},
 };
 
 export function AssetCard({ asset, onDelete }: AssetCardProps) {
-	const config = typeConfig[asset.file_type as keyof typeof typeConfig] ?? typeConfig.other;
+	const config =
+		typeConfig[asset.file_type as keyof typeof typeConfig] ?? typeConfig.other;
 	const Icon = config.icon;
 	const duration = formatDuration(asset.duration_seconds);
 
@@ -61,22 +84,39 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
 							src={asset.file_url}
 							alt={asset.file_name}
 							className="w-full h-full object-cover opacity-70"
-							onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+							onError={(e) => {
+								(e.target as HTMLImageElement).style.display = "none";
+							}}
 						/>
 						<div className="absolute inset-0 flex items-center justify-center">
-							<div className={cn("h-10 w-10 rounded-full flex items-center justify-center", config.bg)}>
+							<div
+								className={cn(
+									"h-10 w-10 rounded-full flex items-center justify-center",
+									config.bg,
+								)}
+							>
 								<Icon className={cn("h-5 w-5", config.color)} />
 							</div>
 						</div>
 					</div>
 				) : (
-					<div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", config.bg)}>
+					<div
+						className={cn(
+							"h-12 w-12 rounded-xl flex items-center justify-center",
+							config.bg,
+						)}
+					>
 						<Icon className={cn("h-6 w-6", config.color)} />
 					</div>
 				)}
 
 				{/* Type badge */}
-				<div className={cn("absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize", config.badge)}>
+				<div
+					className={cn(
+						"absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize",
+						config.badge,
+					)}
+				>
 					{asset.file_type}
 				</div>
 
@@ -98,10 +138,16 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
 
 			{/* Info */}
 			<div className="px-3 py-2.5">
-				<p className="text-xs font-medium text-white truncate mb-0.5">{asset.file_name}</p>
+				<p className="text-xs font-medium text-white truncate mb-0.5">
+					{asset.file_name}
+				</p>
 				<div className="flex items-center justify-between text-[10px] text-[#606060]">
 					<span>{formatFileSize(asset.file_size)}</span>
-					<span>{formatDistanceToNow(new Date(asset.uploaded_at), { addSuffix: true })}</span>
+					<span>
+						{formatDistanceToNow(new Date(asset.uploaded_at), {
+							addSuffix: true,
+						})}
+					</span>
 				</div>
 			</div>
 		</div>

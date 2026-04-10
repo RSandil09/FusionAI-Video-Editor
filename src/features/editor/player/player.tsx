@@ -11,10 +11,15 @@ const Player = () => {
 	// beyond the new value. Remotion throws an invariant error if the current
 	// frame exceeds durationInFrames-1. We only allow a shrink when the playhead
 	// is safely inside the new range.
-	const safeDurationFramesRef = useRef(Math.max(1, Math.round((duration / 1000) * fps)));
+	const safeDurationFramesRef = useRef(
+		Math.max(1, Math.round((duration / 1000) * fps)),
+	);
 	const computedFrames = Math.max(1, Math.round((duration / 1000) * fps));
 	const currentFrame = playerRef.current?.getCurrentFrame?.() ?? 0;
-	if (computedFrames > safeDurationFramesRef.current || currentFrame < computedFrames) {
+	if (
+		computedFrames > safeDurationFramesRef.current ||
+		currentFrame < computedFrames
+	) {
 		safeDurationFramesRef.current = computedFrames;
 	}
 

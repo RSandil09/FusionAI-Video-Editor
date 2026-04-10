@@ -142,7 +142,6 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 							error: renderError,
 						} = statusInfo;
 
-
 						set({ progress: progress ?? 0 });
 
 						if (status === "COMPLETED") {

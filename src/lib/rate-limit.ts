@@ -65,7 +65,11 @@ function scheduleCleanup() {
 	if (!cleanupTimer) cleanupTimer = setInterval(cleanup, CLEANUP_INTERVAL_MS);
 }
 
-function checkMemory(key: string, limit: number, windowMs: number): RateLimitResult {
+function checkMemory(
+	key: string,
+	limit: number,
+	windowMs: number,
+): RateLimitResult {
 	scheduleCleanup();
 	const now = Date.now();
 	let entry = store.get(key);

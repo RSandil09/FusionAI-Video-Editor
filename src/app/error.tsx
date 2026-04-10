@@ -22,7 +22,8 @@ export default function Error({
 			<div className="flex flex-col items-center gap-2 text-center">
 				<h2 className="text-xl font-semibold">Something went wrong</h2>
 				<p className="max-w-md text-sm text-muted-foreground">
-					An unexpected error occurred. The issue has been reported automatically.
+					An unexpected error occurred. The issue has been reported
+					automatically.
 				</p>
 				{error.digest && (
 					<p className="text-xs text-muted-foreground">

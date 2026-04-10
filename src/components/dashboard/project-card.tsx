@@ -3,8 +3,13 @@
 import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-	MoreVertical, Trash2, Clock, Pencil, Play,
-	Video, ExternalLink,
+	MoreVertical,
+	Trash2,
+	Clock,
+	Pencil,
+	Play,
+	Video,
+	ExternalLink,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -52,11 +57,18 @@ export function ProjectCard({
 	const [isSaving, setIsSaving] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
-	const aspect = getAspectLabel(project.resolution_width, project.resolution_height);
+	const aspect = getAspectLabel(
+		project.resolution_width,
+		project.resolution_height,
+	);
 	const duration = formatDuration(project.duration);
-	const lastEdited = formatDistanceToNow(new Date(project.updated_at), { addSuffix: true });
+	const lastEdited = formatDistanceToNow(new Date(project.updated_at), {
+		addSuffix: true,
+	});
 
-	const handleOpen = () => { if (!isRenaming) router.push(`/editor/${project.id}`); };
+	const handleOpen = () => {
+		if (!isRenaming) router.push(`/editor/${project.id}`);
+	};
 
 	const handleDelete = (e: React.MouseEvent) => {
 		e.stopPropagation();
@@ -82,10 +94,16 @@ export function ProjectCard({
 		setIsSaving(true);
 		try {
 			const token = await getIdToken();
-			if (!token) { toast.error("Not authenticated"); return; }
+			if (!token) {
+				toast.error("Not authenticated");
+				return;
+			}
 			const res = await fetch(`/api/projects/${project.id}`, {
 				method: "PATCH",
-				headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
 				body: JSON.stringify({ name: newName }),
 			});
 			if (res.ok) {
@@ -107,21 +125,33 @@ export function ProjectCard({
 
 	const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 		if (e.key === "Enter") commitRename();
-		if (e.key === "Escape") { setIsRenaming(false); setRenameValue(project.name); }
+		if (e.key === "Escape") {
+			setIsRenaming(false);
+			setRenameValue(project.name);
+		}
 		e.stopPropagation();
 	};
 
 	const MenuButton = () => (
 		<div className="relative">
 			<button
-				onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+				onClick={(e) => {
+					e.stopPropagation();
+					setShowMenu(!showMenu);
+				}}
 				className="flex items-center justify-center h-7 w-7 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
 			>
 				<MoreVertical className="h-3.5 w-3.5 text-[#a0a0a0]" />
 			</button>
 			{showMenu && (
 				<>
-					<div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} />
+					<div
+						className="fixed inset-0 z-10"
+						onClick={(e) => {
+							e.stopPropagation();
+							setShowMenu(false);
+						}}
+					/>
 					<div className="absolute right-0 top-full mt-1 z-20 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-1 min-w-[140px]">
 						<button
 							onClick={startRename}
@@ -131,7 +161,10 @@ export function ProjectCard({
 							Rename
 						</button>
 						<button
-							onClick={(e) => { e.stopPropagation(); router.push(`/editor/${project.id}`); }}
+							onClick={(e) => {
+								e.stopPropagation();
+								router.push(`/editor/${project.id}`);
+							}}
 							className="w-full px-3 py-2 text-left text-sm hover:bg-white/5 flex items-center gap-2 text-[#e0e0e0] transition-colors"
 						>
 							<ExternalLink className="h-3.5 w-3.5 text-[#707070]" />
@@ -161,7 +194,11 @@ export function ProjectCard({
 				{/* Thumb */}
 				<div className="relative h-12 w-20 shrink-0 rounded-lg overflow-hidden bg-white/5 border border-white/8">
 					{project.thumbnail_url ? (
-						<img src={project.thumbnail_url} alt={project.name} className="w-full h-full object-cover" />
+						<img
+							src={project.thumbnail_url}
+							alt={project.name}
+							className="w-full h-full object-cover"
+						/>
 					) : (
 						<div className="w-full h-full flex items-center justify-center">
 							<Video className="h-5 w-5 text-[#404040]" />
@@ -184,7 +221,10 @@ export function ProjectCard({
 							className="w-full text-sm font-semibold bg-[#222] border border-[#ff6a00]/50 rounded px-2 py-1 outline-none text-white"
 						/>
 					) : (
-						<p className="text-sm font-semibold text-white truncate" onDoubleClick={startRename}>
+						<p
+							className="text-sm font-semibold text-white truncate"
+							onDoubleClick={startRename}
+						>
 							{project.name}
 						</p>
 					)}
@@ -192,17 +232,25 @@ export function ProjectCard({
 
 				{/* Meta */}
 				<div className="hidden md:flex items-center gap-4 text-xs text-[#606060] shrink-0">
-					{aspect && <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/8">{aspect}</span>}
+					{aspect && (
+						<span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/8">
+							{aspect}
+						</span>
+					)}
 					{duration && <span className="font-mono">{duration}</span>}
 					<span className="flex items-center gap-1">
-						<Clock className="h-3 w-3" />{lastEdited}
+						<Clock className="h-3 w-3" />
+						{lastEdited}
 					</span>
 				</div>
 
 				{/* Actions */}
 				<div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
 					<button
-						onClick={(e) => { e.stopPropagation(); router.push(`/editor/${project.id}`); }}
+						onClick={(e) => {
+							e.stopPropagation();
+							router.push(`/editor/${project.id}`);
+						}}
 						className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6a00] hover:bg-[#ff7a1a] text-white text-xs font-semibold transition-colors"
 					>
 						<Play className="h-3 w-3 fill-white" />
@@ -223,7 +271,11 @@ export function ProjectCard({
 			{/* Thumbnail */}
 			<div className="aspect-video bg-[#0a0a0a] flex items-center justify-center relative overflow-hidden">
 				{project.thumbnail_url ? (
-					<img src={project.thumbnail_url} alt={project.name} className="w-full h-full object-cover" />
+					<img
+						src={project.thumbnail_url}
+						alt={project.name}
+						className="w-full h-full object-cover"
+					/>
 				) : (
 					<div className="flex flex-col items-center text-[#303030]">
 						<Video className="h-12 w-12 mb-1.5" />
@@ -254,7 +306,10 @@ export function ProjectCard({
 				</div>
 
 				{/* Menu button top-right */}
-				<div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+				<div
+					className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+					onClick={(e) => e.stopPropagation()}
+				>
 					<MenuButton />
 				</div>
 			</div>

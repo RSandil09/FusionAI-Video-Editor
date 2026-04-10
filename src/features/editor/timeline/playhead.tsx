@@ -1,6 +1,13 @@
 import { useCurrentPlayerFrame } from "../hooks/use-current-frame";
 import useStore from "../store/use-store";
-import { MouseEvent, TouchEvent, useCallback, useEffect, useRef, useState } from "react";
+import {
+	MouseEvent,
+	TouchEvent,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { timeMsToUnits, unitsToTimeMs } from "../utils/timeline";
 import { TIMELINE_OFFSET_CANVAS_LEFT } from "../constants/constants";
 import { useTimelineOffsetX } from "../hooks/use-timeline-offset";

@@ -12,7 +12,8 @@ function verifySignedState(state: string): { userId: string } | null {
 	const sig = state.slice(dot + 1);
 	const expected = createHmac("sha256", secret).update(payload).digest("hex");
 	try {
-		if (!timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"))) return null;
+		if (!timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex")))
+			return null;
 	} catch {
 		return null;
 	}

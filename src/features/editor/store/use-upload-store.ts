@@ -131,7 +131,6 @@ export const useUploadStore = create<UploadStore>()((set, get) => ({
 
 	loadUserAssets: async () => {
 		try {
-
 			// Import getAssets function
 			const { getAssets } = await import("@/lib/db/assets");
 			const { getCurrentUser } = await import("@/lib/auth/client");

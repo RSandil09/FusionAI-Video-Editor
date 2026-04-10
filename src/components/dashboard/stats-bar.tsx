@@ -18,7 +18,9 @@ function formatBytes(bytes: number): string {
 	const k = 1024;
 	const sizes = ["B", "KB", "MB", "GB", "TB"];
 	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return (bytes / Math.pow(k, i)).toFixed(1).replace(/\.0$/, "") + " " + sizes[i];
+	return (
+		(bytes / Math.pow(k, i)).toFixed(1).replace(/\.0$/, "") + " " + sizes[i]
+	);
 }
 
 interface StatCardProps {
@@ -31,10 +33,28 @@ interface StatCardProps {
 	className?: string;
 }
 
-function StatCard({ icon: Icon, iconColor, iconBg, label, value, sub, className }: StatCardProps) {
+function StatCard({
+	icon: Icon,
+	iconColor,
+	iconBg,
+	label,
+	value,
+	sub,
+	className,
+}: StatCardProps) {
 	return (
-		<div className={cn("flex items-center gap-3.5 p-4 rounded-xl border border-white/8 bg-[#111111]", className)}>
-			<div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", iconBg)}>
+		<div
+			className={cn(
+				"flex items-center gap-3.5 p-4 rounded-xl border border-white/8 bg-[#111111]",
+				className,
+			)}
+		>
+			<div
+				className={cn(
+					"flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+					iconBg,
+				)}
+			>
 				<Icon className={cn("h-4 w-4", iconColor)} />
 			</div>
 			<div className="min-w-0">
@@ -57,9 +77,11 @@ export function StatsBar({
 }: StatsBarProps) {
 	const storagePercent = Math.min(100, (storageUsed / storageQuotaBytes) * 100);
 	const storageColor =
-		storagePercent > 90 ? "bg-red-500" :
-		storagePercent > 70 ? "bg-amber-500" :
-		"bg-[#ff6a00]";
+		storagePercent > 90
+			? "bg-red-500"
+			: storagePercent > 70
+				? "bg-amber-500"
+				: "bg-[#ff6a00]";
 
 	return (
 		<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-7">
@@ -82,17 +104,20 @@ export function StatsBar({
 						<div className="flex items-center gap-2 text-[10px] text-[#606060]">
 							{assetBreakdown.video > 0 && (
 								<span className="flex items-center gap-0.5">
-									<Film className="h-2.5 w-2.5" />{assetBreakdown.video}
+									<Film className="h-2.5 w-2.5" />
+									{assetBreakdown.video}
 								</span>
 							)}
 							{assetBreakdown.image > 0 && (
 								<span className="flex items-center gap-0.5">
-									<Image className="h-2.5 w-2.5" />{assetBreakdown.image}
+									<Image className="h-2.5 w-2.5" />
+									{assetBreakdown.image}
 								</span>
 							)}
 							{assetBreakdown.audio > 0 && (
 								<span className="flex items-center gap-0.5">
-									<Music className="h-2.5 w-2.5" />{assetBreakdown.audio}
+									<Music className="h-2.5 w-2.5" />
+									{assetBreakdown.audio}
 								</span>
 							)}
 						</div>
@@ -110,7 +135,10 @@ export function StatsBar({
 					<div className="flex items-center gap-2 mt-1">
 						<div className="flex-1 h-1 rounded-full bg-white/8 overflow-hidden">
 							<div
-								className={cn("h-full rounded-full transition-all duration-500", storageColor)}
+								className={cn(
+									"h-full rounded-full transition-all duration-500",
+									storageColor,
+								)}
 								style={{ width: `${storagePercent}%` }}
 							/>
 						</div>

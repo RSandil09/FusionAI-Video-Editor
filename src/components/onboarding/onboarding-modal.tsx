@@ -78,11 +78,16 @@ export function OnboardingModal({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onComplete(true); }}>
-			<DialogContent
-				className="p-0 overflow-hidden border-0 shadow-none bg-transparent max-w-[440px] w-full"
-			>
-				<DialogTitle className="sr-only">Connect your publish channels</DialogTitle>
+		<Dialog
+			open={open}
+			onOpenChange={(isOpen) => {
+				if (!isOpen) onComplete(true);
+			}}
+		>
+			<DialogContent className="p-0 overflow-hidden border-0 shadow-none bg-transparent max-w-[440px] w-full">
+				<DialogTitle className="sr-only">
+					Connect your publish channels
+				</DialogTitle>
 
 				{/* Outer glow ring */}
 				<div className="relative rounded-2xl bg-[#111111] border border-white/10 shadow-2xl shadow-black/60 overflow-hidden">
@@ -113,67 +118,108 @@ export function OnboardingModal({
 
 						{/* Platform list */}
 						<div className="space-y-2">
-							{platforms.map(({ id, name, description, ready, icon, iconBg, iconColor, glowColor, badge }) => {
-								const connected = isConnected(id);
-								const isConnecting = connecting === id;
+							{platforms.map(
+								({
+									id,
+									name,
+									description,
+									ready,
+									icon,
+									iconBg,
+									iconColor,
+									glowColor,
+									badge,
+								}) => {
+									const connected = isConnected(id);
+									const isConnecting = connecting === id;
 
-								return (
-									<button
-										key={id}
-										onClick={() => ready && !connected && !connecting && handleConnect(id)}
-										disabled={!ready || !!connecting || connected}
-										className={cn(
-											"group w-full flex items-center gap-4 p-3.5 rounded-xl border transition-all duration-200 text-left",
-											connected
-												? "border-emerald-500/30 bg-emerald-500/5"
-												: ready
-													? "border-white/8 bg-white/3 hover:bg-white/6 hover:border-white/15 cursor-pointer"
-													: "border-white/5 bg-white/2 cursor-not-allowed opacity-60",
-											glowColor,
-										)}
-									>
-										{/* Icon */}
-										<div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", iconBg, iconColor)}>
-											{icon}
-										</div>
-
-										{/* Text */}
-										<div className="flex-1 min-w-0">
-											<div className="flex items-center gap-2">
-												<span className="text-sm font-semibold text-white">{name}</span>
-												{badge && (
-													<span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white/8 text-[#a0a0a0] border border-white/10">
-														{badge}
-													</span>
+									return (
+										<button
+											key={id}
+											onClick={() =>
+												ready && !connected && !connecting && handleConnect(id)
+											}
+											disabled={!ready || !!connecting || connected}
+											className={cn(
+												"group w-full flex items-center gap-4 p-3.5 rounded-xl border transition-all duration-200 text-left",
+												connected
+													? "border-emerald-500/30 bg-emerald-500/5"
+													: ready
+														? "border-white/8 bg-white/3 hover:bg-white/6 hover:border-white/15 cursor-pointer"
+														: "border-white/5 bg-white/2 cursor-not-allowed opacity-60",
+												glowColor,
+											)}
+										>
+											{/* Icon */}
+											<div
+												className={cn(
+													"flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+													iconBg,
+													iconColor,
 												)}
+											>
+												{icon}
 											</div>
-											<p className="text-xs text-[#707070] truncate">{description}</p>
-										</div>
 
-										{/* Status */}
-										<div className="shrink-0">
-											{connected ? (
-												<div className="flex items-center gap-1.5 text-emerald-400">
-													<div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-													<span className="text-xs font-medium">Connected</span>
+											{/* Text */}
+											<div className="flex-1 min-w-0">
+												<div className="flex items-center gap-2">
+													<span className="text-sm font-semibold text-white">
+														{name}
+													</span>
+													{badge && (
+														<span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-white/8 text-[#a0a0a0] border border-white/10">
+															{badge}
+														</span>
+													)}
 												</div>
-											) : isConnecting ? (
-												<div className="flex items-center gap-1.5 text-[#a0a0a0]">
-													<svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-														<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-														<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-													</svg>
-													<span className="text-xs">Connecting</span>
-												</div>
-											) : ready ? (
-												<span className="text-xs font-semibold text-[#ff6a00] group-hover:text-[#ff8533] transition-colors">
-													Connect →
-												</span>
-											) : null}
-										</div>
-									</button>
-								);
-							})}
+												<p className="text-xs text-[#707070] truncate">
+													{description}
+												</p>
+											</div>
+
+											{/* Status */}
+											<div className="shrink-0">
+												{connected ? (
+													<div className="flex items-center gap-1.5 text-emerald-400">
+														<div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+														<span className="text-xs font-medium">
+															Connected
+														</span>
+													</div>
+												) : isConnecting ? (
+													<div className="flex items-center gap-1.5 text-[#a0a0a0]">
+														<svg
+															className="h-3.5 w-3.5 animate-spin"
+															viewBox="0 0 24 24"
+															fill="none"
+														>
+															<circle
+																className="opacity-25"
+																cx="12"
+																cy="12"
+																r="10"
+																stroke="currentColor"
+																strokeWidth="4"
+															/>
+															<path
+																className="opacity-75"
+																fill="currentColor"
+																d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+															/>
+														</svg>
+														<span className="text-xs">Connecting</span>
+													</div>
+												) : ready ? (
+													<span className="text-xs font-semibold text-[#ff6a00] group-hover:text-[#ff8533] transition-colors">
+														Connect →
+													</span>
+												) : null}
+											</div>
+										</button>
+									);
+								},
+							)}
 						</div>
 
 						{/* Progress hint */}
@@ -181,7 +227,8 @@ export function OnboardingModal({
 							<div className="flex items-center gap-2 px-1">
 								<Check className="h-3.5 w-3.5 text-emerald-400" />
 								<span className="text-xs text-[#a0a0a0]">
-									{connectedCount} of {platforms.filter(p => p.ready).length} channel{connectedCount !== 1 ? "s" : ""} connected
+									{connectedCount} of {platforms.filter((p) => p.ready).length}{" "}
+									channel{connectedCount !== 1 ? "s" : ""} connected
 								</span>
 							</div>
 						)}

@@ -41,7 +41,11 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		const rl = await checkRateLimit(`generate:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS);
+		const rl = await checkRateLimit(
+			`generate:${user.id}`,
+			RATE_LIMIT,
+			RATE_WINDOW_MS,
+		);
 		if (!rl.success) {
 			return NextResponse.json(
 				{ error: "Rate limit exceeded. Try again later." },
@@ -80,7 +84,10 @@ export async function POST(request: NextRequest) {
 		}
 
 		if (!Array.isArray(assets)) {
-			return NextResponse.json({ error: "assets must be an array" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "assets must be an array" },
+				{ status: 400 },
+			);
 		}
 
 		// Validate each asset
@@ -131,7 +138,9 @@ export async function POST(request: NextRequest) {
 		//    synchronously within the request. The client shows a loading screen
 		//    until this resolves. Typical time: 5–30s depending on video sizes.
 
-		logger.log(`[generate] Running auto-arrange for ${assets.length} asset(s)...`);
+		logger.log(
+			`[generate] Running auto-arrange for ${assets.length} asset(s)...`,
+		);
 
 		let editorState: Awaited<ReturnType<typeof autoArrangeAssets>>;
 		try {
@@ -154,7 +163,7 @@ export async function POST(request: NextRequest) {
 		const arrangedState = editorState as Record<string, any>;
 		logger.log(
 			`[generate] Auto-arrange complete. Duration: ${arrangedState.duration}ms, ` +
-			`Items: ${(arrangedState.trackItemIds as unknown[]).length}`,
+				`Items: ${(arrangedState.trackItemIds as unknown[]).length}`,
 		);
 
 		// 6. Save editor_state to the project

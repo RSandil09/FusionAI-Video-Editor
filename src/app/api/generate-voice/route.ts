@@ -104,10 +104,7 @@ export async function POST(request: NextRequest) {
 
 		if (!ttsResponse.ok) {
 			const errorData = await ttsResponse.json().catch(() => ({}));
-			logger.error(
-				"Google TTS API error:",
-				JSON.stringify(errorData, null, 2),
-			);
+			logger.error("Google TTS API error:", JSON.stringify(errorData, null, 2));
 
 			// Provide helpful error messages
 			const errorMessage = errorData.error?.message || "TTS API failed";

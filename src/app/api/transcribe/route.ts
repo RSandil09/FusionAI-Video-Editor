@@ -135,7 +135,9 @@ export async function POST(request: Request) {
 
 	try {
 		// ── 1. Fetch the media file ────────────────────────────────────────────
-		const mediaRes = await fetch(absoluteMediaUrl, { signal: AbortSignal.timeout(60_000) });
+		const mediaRes = await fetch(absoluteMediaUrl, {
+			signal: AbortSignal.timeout(60_000),
+		});
 		if (!mediaRes.ok) {
 			throw new Error(
 				`Failed to fetch media (${mediaRes.status}): ${absoluteMediaUrl}`,

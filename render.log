@@ -493,3 +493,77 @@ The response body was:
 [2026-03-19T11:35:57.189Z] [46f5d49c-90fa-4767-9fc4-b793eeebffe8] Uploading to R2...
 [2026-03-19T11:36:01.164Z] [46f5d49c-90fa-4767-9fc4-b793eeebffe8] Upload complete: https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/renders/46f5d49c-90fa-4767-9fc4-b793eeebffe8.mp4
 [2026-03-19T11:36:01.414Z] [46f5d49c-90fa-4767-9fc4-b793eeebffe8] Job completed successfully
+[2026-03-20T11:57:52.473Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] Starting render job. Config: "VideoEditor"
+[2026-03-20T11:57:52.788Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] Bundling Remotion project...
+[2026-03-20T11:58:06.219Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] Bundle created at: C:\Users\stole\AppData\Local\Temp\remotion-webpack-bundle-aiu5Wa
+[2026-03-20T11:58:06.451Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] Selecting composition: VideoEditor
+[2026-03-20T11:58:09.333Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] Composition selected: 1080x1920
+[2026-03-20T11:58:09.972Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] Rendering video to C:\Users\stole\AppData\Local\Temp\15fd9d5a-ee14-463d-aacd-13045b1969b0.mp4...
+[2026-03-20T12:00:25.507Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] Render failed: Error loading image with src: https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/users/njFr44KGN4QZB1QCM7Szic3J4eg1/uploads/1774007528931-bg-removed.png
+[2026-03-20T12:00:26.073Z] [15fd9d5a-ee14-463d-aacd-13045b1969b0] CRITICAL FAIL: Error: Error loading image with src: https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/users/njFr44KGN4QZB1QCM7Szic3J4eg1/uploads/1774007528931-bg-removed.png
+    at cancelRender (http://localhost:3002/bundle.js:22519:13)
+    at http://localhost:3002/bundle.js:26226:5
+    at processDispatchQueue (http://localhost:3002/bundle.js:40560:13)
+    at http://localhost:3002/bundle.js:41112:5
+    at batchedUpdates$1 (http://localhost:3002/bundle.js:30172:36)
+    at dispatchEventForPluginEventSystem (http://localhost:3002/bundle.js:40698:3)
+    at dispatchEvent (http://localhost:3002/bundle.js:43401:7)
+[2026-03-20T12:06:38.193Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] Starting render job. Config: "VideoEditor"
+[2026-03-20T12:06:38.592Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] Bundling Remotion project...
+[2026-03-20T12:06:43.880Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] Bundle created at: C:\Users\stole\AppData\Local\Temp\remotion-webpack-bundle-aCDyeJ
+[2026-03-20T12:06:44.201Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] Selecting composition: VideoEditor
+[2026-03-20T12:06:45.751Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] Composition selected: 1080x1920
+[2026-03-20T12:06:46.105Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] Rendering video to C:\Users\stole\AppData\Local\Temp\9eb1b6c4-8d30-4edd-9826-c9c91691af90.mp4...
+[2026-03-20T12:09:01.752Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] Render failed: Error loading image with src: https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/users/njFr44KGN4QZB1QCM7Szic3J4eg1/uploads/1774007528931-bg-removed.png
+[2026-03-20T12:09:02.141Z] [9eb1b6c4-8d30-4edd-9826-c9c91691af90] CRITICAL FAIL: Error: Error loading image with src: https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/users/njFr44KGN4QZB1QCM7Szic3J4eg1/uploads/1774007528931-bg-removed.png
+    at cancelRender (http://localhost:3002/bundle.js:22519:13)
+    at http://localhost:3002/bundle.js:26226:5
+    at processDispatchQueue (http://localhost:3002/bundle.js:40560:13)
+    at http://localhost:3002/bundle.js:41112:5
+    at batchedUpdates$1 (http://localhost:3002/bundle.js:30172:36)
+    at dispatchEventForPluginEventSystem (http://localhost:3002/bundle.js:40698:3)
+    at dispatchEvent (http://localhost:3002/bundle.js:43401:7)
+[2026-03-29T10:46:57.381Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Starting render job. Config: "VideoEditor"
+[2026-03-29T10:46:57.693Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Bundling Remotion project...
+[2026-03-29T10:47:02.241Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Bundle created at: C:\Users\stole\AppData\Local\Temp\remotion-webpack-bundle-mO1GmR
+[2026-03-29T10:47:02.935Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Selecting composition: VideoEditor
+[2026-03-29T10:47:06.361Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Composition selected: 1080x1920
+[2026-03-29T10:47:06.940Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Rendering video to C:\Users\stole\AppData\Local\Temp\1eccd0ab-0e82-4925-9c9e-f32fee771f5d.mp4...
+[2026-03-29T10:48:28.762Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Rendering finished
+[2026-03-29T10:48:29.339Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Uploading to R2...
+[2026-03-29T10:48:59.435Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Upload complete: https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/renders/1eccd0ab-0e82-4925-9c9e-f32fee771f5d.mp4
+[2026-03-29T10:48:59.673Z] [1eccd0ab-0e82-4925-9c9e-f32fee771f5d] Job completed successfully
+[2026-04-09T07:49:42.463Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Starting render job. Config: "VideoEditor"
+[2026-04-09T07:49:42.495Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Starting render job. Config: "VideoEditor"
+[2026-04-09T07:49:42.813Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Bundling Remotion project...
+[2026-04-09T07:49:42.865Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Bundling Remotion project...
+[2026-04-09T07:49:51.055Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Bundle created at: C:\Users\stole\AppData\Local\Temp\remotion-webpack-bundle-7gW9nB
+[2026-04-09T07:49:51.106Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Bundle created at: C:\Users\stole\AppData\Local\Temp\remotion-webpack-bundle-wQFty3
+[2026-04-09T07:49:52.480Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Selecting composition: VideoEditor
+[2026-04-09T07:49:53.863Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Selecting composition: VideoEditor
+[2026-04-09T07:49:55.426Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Composition selected: 1080x1920
+[2026-04-09T07:49:55.513Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Composition selected: 1080x1920
+[2026-04-09T07:49:55.741Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Rendering video to C:\Users\stole\AppData\Local\Temp\c1c35c30-902a-4d37-9f85-f7f27e6a162f.mp4...
+[2026-04-09T07:49:56.522Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Rendering video to C:\Users\stole\AppData\Local\Temp\314bc5df-4de1-471e-abc4-6c8b491127bd.mp4...
+[2026-04-09T07:50:57.563Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Rendering finished
+[2026-04-09T07:50:58.705Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Rendering finished
+[2026-04-09T07:51:10.705Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Uploading to R2...
+[2026-04-09T07:51:10.799Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Uploading to R2...
+[2026-04-09T07:51:57.305Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] Render failed: 
+[2026-04-09T07:51:57.548Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] Render failed: 
+[2026-04-09T07:52:07.943Z] [314bc5df-4de1-471e-abc4-6c8b491127bd] CRITICAL FAIL: AggregateError: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2026-04-09T07:52:07.990Z] [c1c35c30-902a-4d37-9f85-f7f27e6a162f] CRITICAL FAIL: AggregateError: 
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+[2026-04-09T07:57:45.874Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Starting render job. Config: "VideoEditor"
+[2026-04-09T07:57:46.275Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Bundling Remotion project...
+[2026-04-09T07:58:00.626Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Bundle created at: C:\Users\stole\AppData\Local\Temp\remotion-webpack-bundle-0BKckW
+[2026-04-09T07:58:01.434Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Selecting composition: VideoEditor
+[2026-04-09T07:58:02.592Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Composition selected: 1080x1920
+[2026-04-09T07:58:02.966Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Rendering video to C:\Users\stole\AppData\Local\Temp\f3274ab7-4ff3-4177-8510-1839a0a714af.mp4...
+[2026-04-09T07:58:30.014Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Rendering finished
+[2026-04-09T07:58:30.511Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Uploading to R2...
+[2026-04-09T07:58:32.565Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Upload complete: https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev/renders/f3274ab7-4ff3-4177-8510-1839a0a714af.mp4
+[2026-04-09T07:58:32.969Z] [f3274ab7-4ff3-4177-8510-1839a0a714af] Job completed successfully

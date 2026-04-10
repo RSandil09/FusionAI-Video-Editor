@@ -41,7 +41,11 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		const rl = await checkRateLimit(`uploads:${userId}`, RATE_LIMIT, RATE_WINDOW_MS);
+		const rl = await checkRateLimit(
+			`uploads:${userId}`,
+			RATE_LIMIT,
+			RATE_WINDOW_MS,
+		);
 		if (!rl.success) {
 			return NextResponse.json(
 				{ error: "Rate limit exceeded. Try again later." },
@@ -120,7 +124,10 @@ async function handleFileUpload(
 	const clientType = file.type.toLowerCase().split(";")[0].trim();
 	if (!ALLOWED_MIME_PREFIXES.some((p) => clientType.startsWith(p))) {
 		return NextResponse.json(
-			{ error: "Unsupported file type", message: "Only video, image, and audio files are allowed" },
+			{
+				error: "Unsupported file type",
+				message: "Only video, image, and audio files are allowed",
+			},
 			{ status: 415 },
 		);
 	}
@@ -203,14 +210,17 @@ async function handleUrlImport(
 			/^10\./,
 			/^172\.(1[6-9]|2\d|3[01])\./,
 			/^192\.168\./,
-			/^169\.254\./,  // link-local / AWS metadata
+			/^169\.254\./, // link-local / AWS metadata
 			/^::1$/,
 			/^fc00:/,
 			/^fe80:/,
 		];
 		if (BLOCKED.some((r) => r.test(hostname))) {
 			return NextResponse.json(
-				{ error: "URL not allowed", message: "Requests to internal addresses are blocked" },
+				{
+					error: "URL not allowed",
+					message: "Requests to internal addresses are blocked",
+				},
 				{ status: 400 },
 			);
 		}

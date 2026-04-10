@@ -260,7 +260,6 @@ const DownloadPopover = ({
 			...stateManager.toJSON(),
 		};
 
-
 		// Set projectId and payload in state before starting export
 		if (projectId) {
 			actions.setProjectId(projectId);
@@ -448,7 +447,6 @@ const SaveButton = ({
 	const [saving, setSaving] = useState(false);
 
 	const handleSave = async () => {
-
 		if (!projectId) {
 			console.error("❌ No projectId provided to SaveButton");
 			toast.error("Project ID not found. Cannot save.");
@@ -496,7 +494,6 @@ const SaveButton = ({
 			} catch {
 				/* raw text */
 			}
-
 
 			if (response.ok) {
 				toast.success("Project saved successfully");

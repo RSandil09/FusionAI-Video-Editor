@@ -2,14 +2,24 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
-	Plus, Folder, Film, Image as ImageIcon, Music, File,
-	LayoutGrid, List, SlidersHorizontal,
+	Plus,
+	Folder,
+	Film,
+	Image as ImageIcon,
+	Music,
+	File,
+	LayoutGrid,
+	List,
+	SlidersHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DashboardNavbar } from "@/components/dashboard/dashboard-navbar";
 import NewProjectModal from "@/components/dashboard/new-project-modal";
-import { ProjectCard, type ViewMode } from "@/components/dashboard/project-card";
+import {
+	ProjectCard,
+	type ViewMode,
+} from "@/components/dashboard/project-card";
 import { AssetCard } from "@/components/dashboard/asset-card";
 import { HeroResumeCard } from "@/components/dashboard/hero-resume-card";
 import { StatsBar } from "@/components/dashboard/stats-bar";
@@ -23,14 +33,20 @@ import type { Database } from "@/lib/db/database.types";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 type Asset = Database["public"]["Tables"]["assets"]["Row"];
-type Render = Database["public"]["Tables"]["renders"]["Row"] & { project_name: string | null };
+type Render = Database["public"]["Tables"]["renders"]["Row"] & {
+	project_name: string | null;
+};
 
 // ─── Filter / sort types ──────────────────────────────────────────────────────
 
 type SortBy = "updated" | "created" | "name";
 type AssetFilter = "all" | "video" | "image" | "audio";
 
-const ASSET_TABS: { id: AssetFilter; label: string; icon: React.ElementType }[] = [
+const ASSET_TABS: {
+	id: AssetFilter;
+	label: string;
+	icon: React.ElementType;
+}[] = [
 	{ id: "all", label: "All", icon: File },
 	{ id: "video", label: "Video", icon: Film },
 	{ id: "image", label: "Image", icon: ImageIcon },
@@ -42,7 +58,10 @@ const ASSET_TABS: { id: AssetFilter; label: string; icon: React.ElementType }[] 
 function sortProjects(projects: Project[], sort: SortBy): Project[] {
 	return [...projects].sort((a, b) => {
 		if (sort === "name") return a.name.localeCompare(b.name);
-		if (sort === "created") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+		if (sort === "created")
+			return (
+				new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+			);
 		return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
 	});
 }
@@ -58,7 +77,8 @@ function getAssetBreakdown(assets: Asset[]) {
 function getRendersThisWeek(renders: Render[]): number {
 	const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 	return renders.filter(
-		(r) => r.status === "completed" && new Date(r.created_at).getTime() > weekAgo,
+		(r) =>
+			r.status === "completed" && new Date(r.created_at).getTime() > weekAgo,
 	).length;
 }
 
@@ -70,9 +90,12 @@ function FirstTimeJourney({ onNew }: { onNew: () => void }) {
 			<div className="h-16 w-16 rounded-2xl bg-[#ff6a00]/10 border border-[#ff6a00]/20 flex items-center justify-center mb-5">
 				<Film className="h-8 w-8 text-[#ff6a00]" />
 			</div>
-			<h3 className="text-lg font-bold text-white mb-2">Create your first project</h3>
+			<h3 className="text-lg font-bold text-white mb-2">
+				Create your first project
+			</h3>
 			<p className="text-sm text-[#707070] max-w-xs mb-6 leading-relaxed">
-				Upload your footage, name your project, and let Fusion arrange it on the timeline automatically.
+				Upload your footage, name your project, and let Fusion arrange it on the
+				timeline automatically.
 			</p>
 			<button
 				onClick={onNew}
@@ -160,7 +183,10 @@ function DashboardContent() {
 			pollRef.current = null;
 		}
 		return () => {
-			if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+			if (pollRef.current) {
+				clearInterval(pollRef.current);
+				pollRef.current = null;
+			}
 		};
 	}, [renders, user]);
 
@@ -213,9 +239,10 @@ function DashboardContent() {
 
 	// ── Derived data ──────────────────────────────────────────
 	const displayedProjects = sortProjects(allProjects, sortBy);
-	const displayedAssets = assetFilter === "all"
-		? allAssets
-		: allAssets.filter((a) => a.file_type === assetFilter);
+	const displayedAssets =
+		assetFilter === "all"
+			? allAssets
+			: allAssets.filter((a) => a.file_type === assetFilter);
 
 	const lastProject = allProjects[0] ?? null;
 	const storageUsed = allAssets.reduce((sum, a) => sum + a.file_size, 0);
@@ -256,7 +283,6 @@ function DashboardContent() {
 			<DashboardNavbar searchItems={searchItems} />
 
 			<main className="container mx-auto px-4 sm:px-6 pb-16 max-w-6xl">
-
 				{/* Welcome */}
 				<div className="mb-6">
 					<h1 className="text-2xl font-bold text-white tracking-tight">
@@ -286,10 +312,8 @@ function DashboardContent() {
 
 				{/* Main 2-column layout */}
 				<div className="flex gap-5">
-
 					{/* Left: Projects + Assets */}
 					<div className="flex-1 min-w-0 space-y-8">
-
 						{/* ── Projects ── */}
 						<section>
 							<div className="flex items-center justify-between gap-3 mb-4">
@@ -313,13 +337,23 @@ function DashboardContent() {
 									<div className="flex items-center border border-white/8 rounded-lg overflow-hidden">
 										<button
 											onClick={() => setViewMode("grid")}
-											className={cn("flex items-center justify-center h-7 w-7 transition-colors", viewMode === "grid" ? "bg-white/10 text-white" : "text-[#606060] hover:text-white")}
+											className={cn(
+												"flex items-center justify-center h-7 w-7 transition-colors",
+												viewMode === "grid"
+													? "bg-white/10 text-white"
+													: "text-[#606060] hover:text-white",
+											)}
 										>
 											<LayoutGrid className="h-3.5 w-3.5" />
 										</button>
 										<button
 											onClick={() => setViewMode("list")}
-											className={cn("flex items-center justify-center h-7 w-7 transition-colors", viewMode === "list" ? "bg-white/10 text-white" : "text-[#606060] hover:text-white")}
+											className={cn(
+												"flex items-center justify-center h-7 w-7 transition-colors",
+												viewMode === "list"
+													? "bg-white/10 text-white"
+													: "text-[#606060] hover:text-white",
+											)}
 										>
 											<List className="h-3.5 w-3.5" />
 										</button>
@@ -373,7 +407,9 @@ function DashboardContent() {
 						{allAssets.length > 0 && (
 							<section>
 								<div className="flex items-center justify-between mb-4">
-									<h2 className="text-base font-bold text-white">Media Library</h2>
+									<h2 className="text-base font-bold text-white">
+										Media Library
+									</h2>
 									<FilterTabs
 										tabs={ASSET_TABS}
 										active={assetFilter}
@@ -383,7 +419,9 @@ function DashboardContent() {
 
 								{displayedAssets.length === 0 ? (
 									<div className="py-10 text-center border border-dashed border-white/8 rounded-xl">
-										<p className="text-sm text-[#505050]">No {assetFilter} assets</p>
+										<p className="text-sm text-[#505050]">
+											No {assetFilter} assets
+										</p>
 									</div>
 								) : (
 									<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

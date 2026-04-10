@@ -6,7 +6,9 @@ function buildSignedState(userId: string): string {
 	const secret = process.env.OAUTH_STATE_SECRET;
 	if (!secret) throw new Error("OAUTH_STATE_SECRET not set in environment");
 	const nonce = randomBytes(16).toString("hex");
-	const payload = Buffer.from(JSON.stringify({ userId, nonce })).toString("base64url");
+	const payload = Buffer.from(JSON.stringify({ userId, nonce })).toString(
+		"base64url",
+	);
 	const sig = createHmac("sha256", secret).update(payload).digest("hex");
 	return `${payload}.${sig}`;
 }

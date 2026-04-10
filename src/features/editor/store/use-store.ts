@@ -58,7 +58,9 @@ interface ITimelineStore {
 	setLockedTrackIds: (ids: string[]) => void;
 	/** Timeline markers */
 	markers: { id: string; timeMs: number; label: string; color: string }[];
-	setMarkers: (markers: { id: string; timeMs: number; label: string; color: string }[]) => void;
+	setMarkers: (
+		markers: { id: string; timeMs: number; label: string; color: string }[],
+	) => void;
 }
 
 const useStore = create<ITimelineStore>((set) => ({

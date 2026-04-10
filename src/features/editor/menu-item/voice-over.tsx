@@ -38,7 +38,11 @@ export const VoiceOver = () => {
 			const res = await fetch("/api/generate-voice", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ voiceId, text: textValue, folder: "voice-overs" }),
+				body: JSON.stringify({
+					voiceId,
+					text: textValue,
+					folder: "voice-overs",
+				}),
 			});
 
 			if (!res.ok) {
@@ -60,7 +64,9 @@ export const VoiceOver = () => {
 				options: {},
 			});
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to generate voice.");
+			setError(
+				err instanceof Error ? err.message : "Failed to generate voice.",
+			);
 		} finally {
 			setLoading(false);
 		}

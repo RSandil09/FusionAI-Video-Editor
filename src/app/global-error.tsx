@@ -37,7 +37,14 @@ export default function GlobalError({
 				<h2 style={{ fontSize: "1.25rem", fontWeight: 600 }}>
 					Something went wrong
 				</h2>
-				<p style={{ fontSize: "0.875rem", color: "#a1a1aa", maxWidth: "28rem", textAlign: "center" }}>
+				<p
+					style={{
+						fontSize: "0.875rem",
+						color: "#a1a1aa",
+						maxWidth: "28rem",
+						textAlign: "center",
+					}}
+				>
 					A critical error occurred. The issue has been reported automatically.
 				</p>
 				{error.digest && (

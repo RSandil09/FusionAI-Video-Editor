@@ -83,7 +83,10 @@ export async function PATCH(
 			) {
 				logger.error("   ❌ editor_state failed structure validation");
 				return NextResponse.json(
-					{ message: "Invalid editor_state: must contain trackItemsMap (object) and trackItemIds (array)" },
+					{
+						message:
+							"Invalid editor_state: must contain trackItemsMap (object) and trackItemIds (array)",
+					},
 					{ status: 400 },
 				);
 			}
@@ -92,14 +95,20 @@ export async function PATCH(
 
 		if (name !== undefined) {
 			if (typeof name !== "string" || name.trim().length === 0) {
-				return NextResponse.json({ message: "name must be a non-empty string" }, { status: 400 });
+				return NextResponse.json(
+					{ message: "name must be a non-empty string" },
+					{ status: 400 },
+				);
 			}
 			updatePayload.name = name.trim();
 		}
 
 		if (Object.keys(updatePayload).length === 0) {
 			return NextResponse.json(
-				{ message: "Nothing to update — provide editor_state or name in the request body" },
+				{
+					message:
+						"Nothing to update — provide editor_state or name in the request body",
+				},
 				{ status: 400 },
 			);
 		}

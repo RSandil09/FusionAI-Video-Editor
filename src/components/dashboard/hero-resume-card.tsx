@@ -30,10 +30,14 @@ function getAspectLabel(w: number | null, h: number | null): string {
 export function HeroResumeCard({ project }: HeroResumeCardProps) {
 	const router = useRouter();
 	const duration = formatDuration(project.duration);
-	const aspect = getAspectLabel(project.resolution_width, project.resolution_height);
-	const resolution = project.resolution_width && project.resolution_height
-		? `${project.resolution_width}×${project.resolution_height}`
-		: null;
+	const aspect = getAspectLabel(
+		project.resolution_width,
+		project.resolution_height,
+	);
+	const resolution =
+		project.resolution_width && project.resolution_height
+			? `${project.resolution_width}×${project.resolution_height}`
+			: null;
 	const lastEdited = formatDistanceToNow(
 		new Date(project.last_accessed_at || project.updated_at),
 		{ addSuffix: true },

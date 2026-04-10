@@ -597,7 +597,8 @@ export default function ControlItemHorizontal() {
 			if (trackItem) {
 				setTrackItem(trackItem);
 				setLayoutTrackItem(trackItem);
-			} else {}
+			} else {
+			}
 		} else {
 			setTrackItem(null);
 			setLayoutTrackItem(null);

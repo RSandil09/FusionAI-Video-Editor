@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import {
-	CheckCircle2, XCircle, Loader2, Download,
-	Film, Image as ImageIcon, Music, File, Clock,
+	CheckCircle2,
+	XCircle,
+	Loader2,
+	Download,
+	Film,
+	Image as ImageIcon,
+	Music,
+	File,
+	Clock,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -24,31 +31,42 @@ function formatBytes(bytes: number): string {
 	const k = 1024;
 	const sizes = ["B", "KB", "MB", "GB"];
 	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return (bytes / Math.pow(k, i)).toFixed(1).replace(/\.0$/, "") + " " + sizes[i];
+	return (
+		(bytes / Math.pow(k, i)).toFixed(1).replace(/\.0$/, "") + " " + sizes[i]
+	);
 }
 
 function getAssetIcon(type: string) {
 	switch (type) {
-		case "video": return Film;
-		case "image": return ImageIcon;
-		case "audio": return Music;
-		default: return File;
+		case "video":
+			return Film;
+		case "image":
+			return ImageIcon;
+		case "audio":
+			return Music;
+		default:
+			return File;
 	}
 }
 
 function getAssetColor(type: string) {
 	switch (type) {
-		case "video": return "text-blue-400 bg-blue-400/10";
-		case "image": return "text-emerald-400 bg-emerald-400/10";
-		case "audio": return "text-purple-400 bg-purple-400/10";
-		default: return "text-[#707070] bg-white/5";
+		case "video":
+			return "text-blue-400 bg-blue-400/10";
+		case "image":
+			return "text-emerald-400 bg-emerald-400/10";
+		case "audio":
+			return "text-purple-400 bg-purple-400/10";
+		default:
+			return "text-[#707070] bg-white/5";
 	}
 }
 
 function RenderItem({ render }: { render: Render }) {
 	const isCompleted = render.status === "completed";
 	const isFailed = render.status === "failed";
-	const isProcessing = render.status === "processing" || render.status === "pending";
+	const isProcessing =
+		render.status === "processing" || render.status === "pending";
 	const time = render.completed_at || render.created_at;
 
 	return (
@@ -57,7 +75,9 @@ function RenderItem({ render }: { render: Render }) {
 			<div className="shrink-0">
 				{isCompleted && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
 				{isFailed && <XCircle className="h-4 w-4 text-red-400" />}
-				{isProcessing && <Loader2 className="h-4 w-4 text-[#ff6a00] animate-spin" />}
+				{isProcessing && (
+					<Loader2 className="h-4 w-4 text-[#ff6a00] animate-spin" />
+				)}
 			</div>
 
 			{/* Info */}
@@ -74,7 +94,9 @@ function RenderItem({ render }: { render: Render }) {
 									style={{ width: `${render.progress}%` }}
 								/>
 							</div>
-							<span className="text-[10px] text-[#606060] shrink-0">{render.progress}%</span>
+							<span className="text-[10px] text-[#606060] shrink-0">
+								{render.progress}%
+							</span>
 						</div>
 					) : (
 						<p className="text-xs text-[#606060] flex items-center gap-1">
@@ -107,7 +129,12 @@ function AssetItem({ asset }: { asset: Asset }) {
 
 	return (
 		<div className="flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition-colors">
-			<div className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center", colorClass)}>
+			<div
+				className={cn(
+					"h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
+					colorClass,
+				)}
+			>
 				{asset.file_type === "image" && asset.file_url ? (
 					<img
 						src={asset.file_url}
@@ -119,9 +146,14 @@ function AssetItem({ asset }: { asset: Asset }) {
 				)}
 			</div>
 			<div className="flex-1 min-w-0">
-				<p className="text-sm font-medium text-white truncate">{asset.file_name}</p>
+				<p className="text-sm font-medium text-white truncate">
+					{asset.file_name}
+				</p>
 				<p className="text-xs text-[#606060]">
-					{formatBytes(asset.file_size)} · {formatDistanceToNow(new Date(asset.uploaded_at), { addSuffix: true })}
+					{formatBytes(asset.file_size)} ·{" "}
+					{formatDistanceToNow(new Date(asset.uploaded_at), {
+						addSuffix: true,
+					})}
 				</p>
 			</div>
 		</div>
@@ -133,7 +165,8 @@ type Tab = "renders" | "uploads";
 export function ActivityFeed({ renders, assets }: ActivityFeedProps) {
 	const [tab, setTab] = useState<Tab>("renders");
 
-	const isEmpty = tab === "renders" ? renders.length === 0 : assets.length === 0;
+	const isEmpty =
+		tab === "renders" ? renders.length === 0 : assets.length === 0;
 
 	return (
 		<div className="rounded-xl border border-white/8 bg-[#111111] overflow-hidden flex flex-col h-full">
@@ -175,11 +208,15 @@ export function ActivityFeed({ renders, assets }: ActivityFeedProps) {
 					</div>
 				) : tab === "renders" ? (
 					<div className="divide-y divide-white/5">
-						{renders.map((r) => <RenderItem key={r.id} render={r} />)}
+						{renders.map((r) => (
+							<RenderItem key={r.id} render={r} />
+						))}
 					</div>
 				) : (
 					<div className="divide-y divide-white/5">
-						{assets.map((a) => <AssetItem key={a.id} asset={a} />)}
+						{assets.map((a) => (
+							<AssetItem key={a.id} asset={a} />
+						))}
 					</div>
 				)}
 			</div>

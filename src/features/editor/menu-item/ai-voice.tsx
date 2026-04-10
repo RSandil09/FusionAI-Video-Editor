@@ -234,7 +234,6 @@ export const AiVoice = () => {
 			// You can add logic here to handle the generated audio
 			// For example, add it to the timeline, play it, etc.
 			if (data.agent?.url) {
-
 				toast.success("Voice generated successfully!");
 
 				// Add the generated audio to the editor timeline

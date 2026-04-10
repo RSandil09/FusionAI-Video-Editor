@@ -123,10 +123,7 @@ export async function getIdToken(retryCount = 0): Promise<string | null> {
 
 		// Validate token length (Firebase tokens are typically 800-1200 characters)
 		if (!token || token.length < 100) {
-			logger.error(
-				"❌ Token appears invalid (too short):",
-				token?.length || 0,
-			);
+			logger.error("❌ Token appears invalid (too short):", token?.length || 0);
 			throw new Error("Invalid token received");
 		}
 
@@ -170,11 +167,7 @@ export async function getIdToken(retryCount = 0): Promise<string | null> {
 			return getIdToken(retryCount + 1);
 		}
 
-		logger.error(
-			"💥 Failed to get ID token after",
-			retryCount + 1,
-			"attempts",
-		);
+		logger.error("💥 Failed to get ID token after", retryCount + 1, "attempts");
 		return null;
 	}
 }

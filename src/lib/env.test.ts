@@ -57,6 +57,8 @@ describe("validateServerEnv", () => {
 		vi.stubEnv("COMBO_SK", "");
 
 		const { validateServerEnv } = await import("./env");
-		expect(() => validateServerEnv()).toThrow("Invalid environment configuration");
+		expect(() => validateServerEnv()).toThrow(
+			"Invalid environment configuration",
+		);
 	});
 });

@@ -103,7 +103,10 @@ export async function getProjects(
  * Passing userId adds an ownership filter so users cannot read other users' projects
  * even if Supabase RLS is misconfigured.
  */
-export async function getProject(projectId: string, userId?: string): Promise<Project | null> {
+export async function getProject(
+	projectId: string,
+	userId?: string,
+): Promise<Project | null> {
 	try {
 		let query = supabase.from("projects").select("*").eq("id", projectId);
 		if (userId) query = query.eq("user_id", userId);
@@ -175,7 +178,10 @@ export async function updateLastAccessed(projectId: string): Promise<boolean> {
 /**
  * Delete a project — userId is required to prevent deleting another user's project.
  */
-export async function deleteProject(projectId: string, userId: string): Promise<boolean> {
+export async function deleteProject(
+	projectId: string,
+	userId: string,
+): Promise<boolean> {
 	try {
 		const { error } = await supabase
 			.from("projects")

@@ -32,7 +32,7 @@ export interface AssetInput {
 
 interface Segment {
 	start: number; // seconds
-	end: number;   // seconds
+	end: number; // seconds
 	label?: string;
 	confidence?: number;
 }
@@ -74,7 +74,9 @@ async function analyseVideoScenes(
 		const sizeMB = buffer.byteLength / (1024 * 1024);
 
 		if (sizeMB > 20) {
-			logger.warn(`[auto-arrange] Video ${sizeMB.toFixed(1)} MB > 20 MB limit — skipping AI`);
+			logger.warn(
+				`[auto-arrange] Video ${sizeMB.toFixed(1)} MB > 20 MB limit — skipping AI`,
+			);
 			return fallback;
 		}
 
@@ -83,19 +85,24 @@ async function analyseVideoScenes(
 
 		const result = await client.models.generateContent({
 			model: "gemini-2.5-flash",
-			contents: [{
-				role: "user",
-				parts: [
-					{ inlineData: { mimeType: contentType, data: base64 } },
-					{ text: SCENE_PROMPT },
-				],
-			}],
+			contents: [
+				{
+					role: "user",
+					parts: [
+						{ inlineData: { mimeType: contentType, data: base64 } },
+						{ text: SCENE_PROMPT },
+					],
+				},
+			],
 		});
 
 		const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
 		const parsed = parseJsonResponse<{ segments: Segment[] }>(rawText);
 		const segments = (parsed?.segments ?? []).filter(
-			(s) => typeof s.start === "number" && typeof s.end === "number" && s.end > s.start,
+			(s) =>
+				typeof s.start === "number" &&
+				typeof s.end === "number" &&
+				s.end > s.start,
 		);
 		return segments.length > 0 ? segments : fallback;
 	} catch (err) {
@@ -105,7 +112,10 @@ async function analyseVideoScenes(
 }
 
 /** Pick top segments by confidence; cap at 4 clips, each 2–15 s */
-function selectBestSegments(segments: Segment[], videoDurationMs: number): Segment[] {
+function selectBestSegments(
+	segments: Segment[],
+	videoDurationMs: number,
+): Segment[] {
 	if (videoDurationMs <= 12_000 || segments.length <= 1) return segments;
 
 	const filtered = segments.filter((s) => {
@@ -125,7 +135,7 @@ function selectBestSegments(segments: Segment[], videoDurationMs: number): Segme
 interface TranscriptWord {
 	word: string;
 	start: number; // seconds
-	end: number;   // seconds
+	end: number; // seconds
 }
 
 const TRANSCRIBE_PROMPT = `
@@ -156,7 +166,9 @@ async function transcribeVideo(url: string): Promise<TranscriptWord[]> {
 		const sizeMB = buffer.byteLength / (1024 * 1024);
 
 		if (sizeMB > 20) {
-			logger.warn(`[auto-arrange] Video ${sizeMB.toFixed(1)} MB > 20 MB — skipping transcription`);
+			logger.warn(
+				`[auto-arrange] Video ${sizeMB.toFixed(1)} MB > 20 MB — skipping transcription`,
+			);
 			return [];
 		}
 
@@ -165,19 +177,24 @@ async function transcribeVideo(url: string): Promise<TranscriptWord[]> {
 
 		const result = await client.models.generateContent({
 			model: "gemini-2.5-flash",
-			contents: [{
-				role: "user",
-				parts: [
-					{ inlineData: { mimeType: contentType, data: base64 } },
-					{ text: TRANSCRIBE_PROMPT },
-				],
-			}],
+			contents: [
+				{
+					role: "user",
+					parts: [
+						{ inlineData: { mimeType: contentType, data: base64 } },
+						{ text: TRANSCRIBE_PROMPT },
+					],
+				},
+			],
 		});
 
 		const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
 		const parsed = parseJsonResponse<{ words: TranscriptWord[] }>(rawText);
 		return (parsed?.words ?? []).filter(
-			(w) => typeof w.word === "string" && typeof w.start === "number" && typeof w.end === "number",
+			(w) =>
+				typeof w.word === "string" &&
+				typeof w.start === "number" &&
+				typeof w.end === "number",
 		);
 	} catch (err) {
 		logger.error("[auto-arrange] Transcription error:", err);
@@ -190,8 +207,18 @@ function groupIntoCaptions(
 	words: TranscriptWord[],
 	maxWords = 6,
 	maxDurationSecs = 4,
-): Array<{ text: string; words: TranscriptWord[]; start: number; end: number }> {
-	const lines: Array<{ text: string; words: TranscriptWord[]; start: number; end: number }> = [];
+): Array<{
+	text: string;
+	words: TranscriptWord[];
+	start: number;
+	end: number;
+}> {
+	const lines: Array<{
+		text: string;
+		words: TranscriptWord[];
+		start: number;
+		end: number;
+	}> = [];
 	let current: TranscriptWord[] = [];
 
 	for (const w of words) {
@@ -268,10 +295,14 @@ function makeCrop(canvasW: number, canvasH: number) {
 }
 
 function makeVideoItem(
-	id: string, src: string,
-	displayFrom: number, displayTo: number,
-	trimFrom: number, trimTo: number,
-	canvasW: number, canvasH: number,
+	id: string,
+	src: string,
+	displayFrom: number,
+	displayTo: number,
+	trimFrom: number,
+	trimTo: number,
+	canvasW: number,
+	canvasH: number,
 ) {
 	return {
 		id,
@@ -297,9 +328,12 @@ function makeVideoItem(
 }
 
 function makeImageItem(
-	id: string, src: string,
-	displayFrom: number, displayTo: number,
-	canvasW: number, canvasH: number,
+	id: string,
+	src: string,
+	displayFrom: number,
+	displayTo: number,
+	canvasW: number,
+	canvasH: number,
 ) {
 	return {
 		id,
@@ -322,9 +356,12 @@ function makeImageItem(
 }
 
 function makeAudioItem(
-	id: string, src: string,
-	displayFrom: number, displayTo: number,
-	trimFrom: number, trimTo: number,
+	id: string,
+	src: string,
+	displayFrom: number,
+	displayTo: number,
+	trimFrom: number,
+	trimTo: number,
 ) {
 	return {
 		id,
@@ -349,9 +386,18 @@ function makeTrack(type: string, itemIds: string[]) {
 		type,
 		name: type === "audio" ? "Audio Track" : "Main Track",
 		items: itemIds,
-		accepts: type === "audio"
-			? ["audio"]
-			: ["video", "image", "audio", "text", "caption", "template", "composition"],
+		accepts:
+			type === "audio"
+				? ["audio"]
+				: [
+						"video",
+						"image",
+						"audio",
+						"text",
+						"caption",
+						"template",
+						"composition",
+					],
 		magnetic: false,
 		static: false,
 	};
@@ -389,7 +435,9 @@ async function detectBeats(url: string): Promise<number[]> {
 		const sizeMB = buffer.byteLength / (1024 * 1024);
 
 		if (sizeMB > 20) {
-			logger.warn(`[auto-arrange] Audio ${sizeMB.toFixed(1)} MB > 20 MB — skipping beat sync`);
+			logger.warn(
+				`[auto-arrange] Audio ${sizeMB.toFixed(1)} MB > 20 MB — skipping beat sync`,
+			);
 			return [];
 		}
 
@@ -398,19 +446,25 @@ async function detectBeats(url: string): Promise<number[]> {
 
 		const result = await client.models.generateContent({
 			model: "gemini-2.5-flash",
-			contents: [{
-				role: "user",
-				parts: [
-					{ inlineData: { mimeType: contentType, data: base64 } },
-					{ text: BEAT_PROMPT },
-				],
-			}],
+			contents: [
+				{
+					role: "user",
+					parts: [
+						{ inlineData: { mimeType: contentType, data: base64 } },
+						{ text: BEAT_PROMPT },
+					],
+				},
+			],
 		});
 
 		const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
 		const parsed = parseJsonResponse<{ bpm: number; beats: number[] }>(rawText);
-		const beats = (parsed?.beats ?? []).filter((b) => typeof b === "number" && b >= 0);
-		logger.log(`[auto-arrange] Beat detection: ${beats.length} beats at ${parsed?.bpm ?? 0} BPM`);
+		const beats = (parsed?.beats ?? []).filter(
+			(b) => typeof b === "number" && b >= 0,
+		);
+		logger.log(
+			`[auto-arrange] Beat detection: ${beats.length} beats at ${parsed?.bpm ?? 0} BPM`,
+		);
 		return beats;
 	} catch (err) {
 		logger.error("[auto-arrange] Beat detection error:", err);
@@ -429,7 +483,10 @@ function snapToNearestBeat(
 	let minDiff = Infinity;
 	for (const b of beatMs) {
 		const diff = Math.abs(b - ms);
-		if (diff < minDiff) { minDiff = diff; closest = b; }
+		if (diff < minDiff) {
+			minDiff = diff;
+			closest = b;
+		}
 	}
 	return minDiff <= toleranceMs ? closest : ms;
 }
@@ -458,9 +515,10 @@ export async function autoArrangeAssets(
 	let cursor = 0; // ms
 
 	// ── Beat detection from first audio asset (runs in parallel with video AI) ──
-	const beatMsPromise = audios.length > 0
-		? detectBeats(audios[0].url)
-		: Promise.resolve([] as number[]);
+	const beatMsPromise =
+		audios.length > 0
+			? detectBeats(audios[0].url)
+			: Promise.resolve([] as number[]);
 
 	// ── Videos: AI scene detection + transcription, run in parallel ─────────────
 	const [videoResults, beatTimestampsSecs] = await Promise.all([
@@ -482,7 +540,8 @@ export async function autoArrangeAssets(
 	const beatMs = beatTimestampsSecs.map((b) => Math.round(b * 1000));
 
 	// Words for caption track — collected as we place video clips
-	const allCaptionWords: Array<TranscriptWord & { displayOffsetMs: number }> = [];
+	const allCaptionWords: Array<TranscriptWord & { displayOffsetMs: number }> =
+		[];
 
 	for (const { asset, segments, transcriptWords } of videoResults) {
 		const w = asset.width ?? size.width;
@@ -490,8 +549,8 @@ export async function autoArrangeAssets(
 
 		for (const seg of segments) {
 			const trimFromMs = Math.round(seg.start * 1000);
-			const trimToMs   = Math.round(seg.end   * 1000);
-			const clipMs     = trimToMs - trimFromMs;
+			const trimToMs = Math.round(seg.end * 1000);
+			const clipMs = trimToMs - trimFromMs;
 			if (clipMs < 500) continue;
 
 			// Snap the clip start to the nearest beat if audio beats available
@@ -508,17 +567,21 @@ export async function autoArrangeAssets(
 				allCaptionWords.push({
 					...tw,
 					start: tw.start - seg.start + displayStart / 1000,
-					end:   tw.end   - seg.start + displayStart / 1000,
+					end: tw.end - seg.start + displayStart / 1000,
 					displayOffsetMs: displayStart,
 				});
 			}
 
 			const id = generateId();
 			trackItemsMap[id] = makeVideoItem(
-				id, asset.url,
-				displayStart, displayStart + clipMs,
-				trimFromMs, trimToMs,
-				w, h,
+				id,
+				asset.url,
+				displayStart,
+				displayStart + clipMs,
+				trimFromMs,
+				trimToMs,
+				w,
+				h,
 			);
 			mainTrackItemIds.push(id);
 			cursor = displayStart + clipMs;
@@ -531,9 +594,12 @@ export async function autoArrangeAssets(
 		const h = asset.height ?? size.height;
 		const id = generateId();
 		trackItemsMap[id] = makeImageItem(
-			id, asset.url,
-			cursor, cursor + IMAGE_DISPLAY_MS,
-			w, h,
+			id,
+			asset.url,
+			cursor,
+			cursor + IMAGE_DISPLAY_MS,
+			w,
+			h,
 		);
 		mainTrackItemIds.push(id);
 		cursor += IMAGE_DISPLAY_MS;
@@ -551,8 +617,9 @@ export async function autoArrangeAssets(
 	const audioTrackItemIds: string[] = [];
 	for (const asset of audios) {
 		const audioDurationMs = asset.durationMs ?? totalVideoDurationMs;
-		const displayTo = totalVideoDurationMs > 0 ? totalVideoDurationMs : audioDurationMs;
-		const trimTo    = Math.min(audioDurationMs, displayTo);
+		const displayTo =
+			totalVideoDurationMs > 0 ? totalVideoDurationMs : audioDurationMs;
+		const trimTo = Math.min(audioDurationMs, displayTo);
 		const id = generateId();
 		trackItemsMap[id] = makeAudioItem(id, asset.url, 0, displayTo, 0, trimTo);
 		audioTrackItemIds.push(id);
@@ -568,7 +635,7 @@ export async function autoArrangeAssets(
 		for (const line of captionLines) {
 			const id = generateId();
 			const fromMs = Math.round(line.start * 1000);
-			const toMs   = Math.round(line.end   * 1000);
+			const toMs = Math.round(line.end * 1000);
 			trackItemsMap[id] = makeCaptionItem(
 				id,
 				line.text,
@@ -604,7 +671,7 @@ export async function autoArrangeAssets(
 	const finalDuration = Math.max(totalVideoDurationMs, audioDuration, 1_000);
 
 	return {
-		id: generateId(),          // ← required by validateEditorState
+		id: generateId(), // ← required by validateEditorState
 		fps,
 		size,
 		duration: finalDuration,

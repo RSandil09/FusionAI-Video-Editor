@@ -149,9 +149,10 @@ export async function GET(request: NextRequest) {
 export async function OPTIONS(request: NextRequest) {
 	const requestOrigin = request.headers.get("origin");
 	const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-	const allowOrigin = (requestOrigin && appUrl && requestOrigin === appUrl)
-		? requestOrigin
-		: (appUrl || "");
+	const allowOrigin =
+		requestOrigin && appUrl && requestOrigin === appUrl
+			? requestOrigin
+			: appUrl || "";
 	return new NextResponse(null, {
 		status: 200,
 		headers: {

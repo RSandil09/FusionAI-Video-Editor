@@ -28,19 +28,19 @@ const CANVAS_TOP_OFFSET = 24; // ruler height
 
 // ── Track type colours ─────────────────────────────────────────────────────────
 const TRACK_COLORS: Record<string, { bg: string; border: string }> = {
-	video:   { bg: "bg-blue-600",    border: "border-blue-500" },
-	image:   { bg: "bg-emerald-600", border: "border-emerald-500" },
-	audio:   { bg: "bg-purple-600",  border: "border-purple-500" },
-	text:    { bg: "bg-amber-600",   border: "border-amber-500" },
-	caption: { bg: "bg-orange-600",  border: "border-orange-500" },
-	default: { bg: "bg-zinc-600",    border: "border-zinc-500" },
+	video: { bg: "bg-blue-600", border: "border-blue-500" },
+	image: { bg: "bg-emerald-600", border: "border-emerald-500" },
+	audio: { bg: "bg-purple-600", border: "border-purple-500" },
+	text: { bg: "bg-amber-600", border: "border-amber-500" },
+	caption: { bg: "bg-orange-600", border: "border-orange-500" },
+	default: { bg: "bg-zinc-600", border: "border-zinc-500" },
 };
 
 const TRACK_ICONS: Record<string, React.ReactNode> = {
-	video:   <Video className="w-3.5 h-3.5" />,
-	image:   <ImageIcon className="w-3.5 h-3.5" />,
-	audio:   <Music className="w-3.5 h-3.5" />,
-	text:    <Type className="w-3.5 h-3.5" />,
+	video: <Video className="w-3.5 h-3.5" />,
+	image: <ImageIcon className="w-3.5 h-3.5" />,
+	audio: <Music className="w-3.5 h-3.5" />,
+	text: <Type className="w-3.5 h-3.5" />,
 	caption: <MessageSquare className="w-3.5 h-3.5" />,
 };
 
@@ -53,15 +53,22 @@ interface TrackInfo {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function getDominantType(itemIds: string[], trackItemsMap: Record<string, any>): string {
+function getDominantType(
+	itemIds: string[],
+	trackItemsMap: Record<string, any>,
+): string {
 	const counts: Record<string, number> = {};
 	for (const id of itemIds) {
 		const t = trackItemsMap[id]?.type;
 		if (t) counts[t] = (counts[t] ?? 0) + 1;
 	}
-	let best = "default", max = 0;
+	let best = "default",
+		max = 0;
 	for (const [t, c] of Object.entries(counts)) {
-		if (c > max) { max = c; best = t; }
+		if (c > max) {
+			max = c;
+			best = t;
+		}
 	}
 	return best;
 }
@@ -70,13 +77,28 @@ function extractFileName(src?: string): string | null {
 	if (!src) return null;
 	try {
 		const file = new URL(src).pathname.split("/").pop();
-		if (file) return file.replace(/^\d+-/, "").replace(/\.[^.]+$/, "").replace(/[_-]/g, " ").slice(0, 18) || null;
-	} catch { /* relative URL */ }
+		if (file)
+			return (
+				file
+					.replace(/^\d+-/, "")
+					.replace(/\.[^.]+$/, "")
+					.replace(/[_-]/g, " ")
+					.slice(0, 18) || null
+			);
+	} catch {
+		/* relative URL */
+	}
 	return null;
 }
 
 function formatLabel(type: string): string {
-	const map: Record<string, string> = { video: "Video", image: "Image", audio: "Audio", text: "Text", caption: "Caption" };
+	const map: Record<string, string> = {
+		video: "Video",
+		image: "Image",
+		audio: "Audio",
+		text: "Text",
+		caption: "Caption",
+	};
 	return map[type] ?? "Track";
 }
 
@@ -86,17 +108,26 @@ export default function TrackLabels({
 	onTrackMetaChange,
 }: {
 	scrollTop: number;
-	onTrackMetaChange?: (trackId: string, patch: { locked?: boolean; muted?: boolean; solo?: boolean }) => void;
+	onTrackMetaChange?: (
+		trackId: string,
+		patch: { locked?: boolean; muted?: boolean; solo?: boolean },
+	) => void;
 }) {
 	const {
 		tracks,
 		trackItemsMap,
-		mutedTrackIds,  setMutedTrackIds,
-		soloTrackIds,   setSoloTrackIds,
-		lockedTrackIds, setLockedTrackIds,
+		mutedTrackIds,
+		setMutedTrackIds,
+		soloTrackIds,
+		setSoloTrackIds,
+		lockedTrackIds,
+		setLockedTrackIds,
 	} = useStore();
 
-	const handleMeta = (trackId: string, patch: { locked?: boolean; muted?: boolean; solo?: boolean }) => {
+	const handleMeta = (
+		trackId: string,
+		patch: { locked?: boolean; muted?: boolean; solo?: boolean },
+	) => {
 		if (patch.muted !== undefined) {
 			setMutedTrackIds(
 				patch.muted
@@ -133,13 +164,17 @@ export default function TrackLabels({
 
 			const firstItemName = (() => {
 				for (const id of itemIds) {
-					const name = extractFileName((trackItemsMap[id] as any)?.details?.src);
+					const name = extractFileName(
+						(trackItemsMap[id] as any)?.details?.src,
+					);
 					if (name) return name;
 				}
 				return null;
 			})();
 
-			const name = track.name ?? `${formatLabel(dominantType)} ${typeCounters[dominantType]}`;
+			const name =
+				track.name ??
+				`${formatLabel(dominantType)} ${typeCounters[dominantType]}`;
 			return { id: track.id, type: dominantType, name, height, firstItemName };
 		});
 	}, [tracks, trackItemsMap]);
@@ -184,13 +219,20 @@ function TrackLabel({
 	locked: boolean;
 	muted: boolean;
 	solo: boolean;
-	onMeta: (patch: { locked?: boolean; muted?: boolean; solo?: boolean }) => void;
+	onMeta: (patch: {
+		locked?: boolean;
+		muted?: boolean;
+		solo?: boolean;
+	}) => void;
 }) {
 	const colors = TRACK_COLORS[track.type] ?? TRACK_COLORS.default;
 	const topGap = isFirst ? 0 : TRACK_GAP;
 
 	return (
-		<div style={{ height: track.height + topGap }} className="flex flex-col justify-end">
+		<div
+			style={{ height: track.height + topGap }}
+			className="flex flex-col justify-end"
+		>
 			<div
 				style={{ height: track.height }}
 				className={cn(
@@ -226,7 +268,9 @@ function TrackLabel({
 							onClick={() => onMeta({ solo: !solo })}
 							className={cn(
 								"w-4 h-4 flex items-center justify-center rounded text-[8px] font-bold transition-colors",
-								solo ? "bg-yellow-500 text-black" : "text-muted-foreground hover:text-foreground",
+								solo
+									? "bg-yellow-500 text-black"
+									: "text-muted-foreground hover:text-foreground",
 							)}
 						>
 							S
@@ -237,10 +281,16 @@ function TrackLabel({
 							onClick={() => onMeta({ muted: !muted })}
 							className={cn(
 								"w-4 h-4 flex items-center justify-center rounded transition-colors",
-								muted ? "text-red-400" : "text-muted-foreground hover:text-foreground",
+								muted
+									? "text-red-400"
+									: "text-muted-foreground hover:text-foreground",
 							)}
 						>
-							{muted ? <VolumeX className="w-2.5 h-2.5" /> : <Volume2 className="w-2.5 h-2.5" />}
+							{muted ? (
+								<VolumeX className="w-2.5 h-2.5" />
+							) : (
+								<Volume2 className="w-2.5 h-2.5" />
+							)}
 						</button>
 
 						<button
@@ -248,10 +298,16 @@ function TrackLabel({
 							onClick={() => onMeta({ locked: !locked })}
 							className={cn(
 								"w-4 h-4 flex items-center justify-center rounded transition-colors",
-								locked ? "text-amber-400" : "text-muted-foreground hover:text-foreground",
+								locked
+									? "text-amber-400"
+									: "text-muted-foreground hover:text-foreground",
 							)}
 						>
-							{locked ? <Lock className="w-2.5 h-2.5" /> : <LockOpen className="w-2.5 h-2.5" />}
+							{locked ? (
+								<Lock className="w-2.5 h-2.5" />
+							) : (
+								<LockOpen className="w-2.5 h-2.5" />
+							)}
 						</button>
 					</div>
 				)}

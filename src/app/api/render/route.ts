@@ -26,7 +26,11 @@ export async function POST(request: Request) {
 		}
 		logger.log("✅ User authenticated:", user.id);
 
-		const rl = await checkRateLimit(`render:${user.id}`, RATE_LIMIT, RATE_WINDOW_MS);
+		const rl = await checkRateLimit(
+			`render:${user.id}`,
+			RATE_LIMIT,
+			RATE_WINDOW_MS,
+		);
 		if (!rl.success) {
 			return NextResponse.json(
 				{ message: "Rate limit exceeded. Try again later." },

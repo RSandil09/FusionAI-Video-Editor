@@ -124,8 +124,12 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
 				if (group.length === 1) {
 					const item = trackItemsMap[group[0].id];
 					// Display-window guard: skip items outside their display.from / display.to range
-					const itemFromFrame = Math.round(((item.display?.from ?? 0) / 1000) * fps);
-					const itemToFrame   = Math.round(((item.display?.to   ?? 0) / 1000) * fps);
+					const itemFromFrame = Math.round(
+						((item.display?.from ?? 0) / 1000) * fps,
+					);
+					const itemToFrame = Math.round(
+						((item.display?.to ?? 0) / 1000) * fps,
+					);
 					if (frame < itemFromFrame || frame >= itemToFrame) return null;
 					return SequenceItem[item.type](item, {
 						fps,
@@ -146,7 +150,10 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
 					<TransitionSeries from={from} key={index}>
 						{group.map((item) => {
 							if (item.type === "transition") {
-								const durationInFrames = Math.max(1, Math.round((item.duration / 1000) * fps));
+								const durationInFrames = Math.max(
+									1,
+									Math.round((item.duration / 1000) * fps),
+								);
 								return Transitions[item.kind]({
 									durationInFrames,
 									...size,

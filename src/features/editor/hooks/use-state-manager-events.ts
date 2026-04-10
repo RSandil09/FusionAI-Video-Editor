@@ -52,8 +52,9 @@ export const useStateManagerEvents = (stateManager: StateManager) => {
 		const durationSubscription = stateManager.subscribeToDuration((newState) =>
 			setState(newState),
 		);
-		const updateTrackItemsMap =
-			stateManager.subscribeToUpdateTrackItem(handleTrackItemUpdate);
+		const updateTrackItemsMap = stateManager.subscribeToUpdateTrackItem(
+			handleTrackItemUpdate,
+		);
 		const itemsDetailsSubscription =
 			stateManager.subscribeToAddOrRemoveItems(handleAddRemoveItems);
 		const updateItemDetailsSubscription =

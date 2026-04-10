@@ -8,9 +8,23 @@ import {
 	TIMELINE_SCALE_CHANGED,
 } from "@designcombo/state";
 import { PLAYER_PAUSE, PLAYER_PLAY } from "../constants/events";
-import { frameToTimeString, getSafeCurrentFrame, timeToString } from "../utils/time";
+import {
+	frameToTimeString,
+	getSafeCurrentFrame,
+	timeToString,
+} from "../utils/time";
 import useStore from "../store/use-store";
-import { Copy, Hand, MapPin, MousePointer2, Scissors, SquareSplitHorizontal, Trash, ZoomIn, ZoomOut } from "lucide-react";
+import {
+	Copy,
+	Hand,
+	MapPin,
+	MousePointer2,
+	Scissors,
+	SquareSplitHorizontal,
+	Trash,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 import {
 	getFitZoomLevel,
 	getNextZoomLevel,
@@ -84,11 +98,21 @@ const IconPlayerSkipForward = ({ size }: { size: number }) => (
 		<path d="M20 5l0 14" />
 	</svg>
 );
-const TOOL_BUTTONS: { mode: ToolMode; icon: React.ReactNode; title: string; key: string }[] = [
-	{ mode: "select", icon: <MousePointer2 size={13} />, title: "Select (V)", key: "V" },
-	{ mode: "razor",  icon: <Scissors size={13} />,      title: "Razor (B)",  key: "B" },
-	{ mode: "hand",   icon: <Hand size={13} />,           title: "Pan (H)",    key: "H" },
-	{ mode: "marker", icon: <MapPin size={13} />,         title: "Marker (M)", key: "M" },
+const TOOL_BUTTONS: {
+	mode: ToolMode;
+	icon: React.ReactNode;
+	title: string;
+	key: string;
+}[] = [
+	{
+		mode: "select",
+		icon: <MousePointer2 size={13} />,
+		title: "Select (V)",
+		key: "V",
+	},
+	{ mode: "razor", icon: <Scissors size={13} />, title: "Razor (B)", key: "B" },
+	{ mode: "hand", icon: <Hand size={13} />, title: "Pan (H)", key: "H" },
+	{ mode: "marker", icon: <MapPin size={13} />, title: "Marker (M)", key: "M" },
 ];
 
 const Header = () => {
@@ -104,7 +128,11 @@ const Header = () => {
 	// Keyboard shortcuts for tool modes
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+			if (
+				e.target instanceof HTMLInputElement ||
+				e.target instanceof HTMLTextAreaElement
+			)
+				return;
 			const tool = TOOL_BUTTONS.find((t) => t.key === e.key.toUpperCase());
 			if (tool) handleToolMode(tool.mode);
 		};

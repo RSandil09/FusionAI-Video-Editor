@@ -51,7 +51,8 @@ const Composition = () => {
 		const hasSolo = soloTrackIds.length > 0;
 
 		for (const track of tracks) {
-			const itemIds: string[] = (track as any).items ?? (track as any).trackItemIds ?? [];
+			const itemIds: string[] =
+				(track as any).items ?? (track as any).trackItemIds ?? [];
 			const isSoloActive = hasSolo && !soloTrackIds.includes(track.id);
 			const isMuted = mutedTrackIds.includes(track.id);
 
@@ -258,8 +259,12 @@ const Composition = () => {
 					// This is the primary visibility gate — Remotion's <Sequence> provides a second
 					// layer inside BaseSequence, but explicit gating here is more reliable and
 					// ensures no item leaks outside its display.from / display.to range.
-					const itemFromFrame = Math.round(((item.display?.from ?? 0) / 1000) * fps);
-					const itemToFrame = Math.round(((item.display?.to ?? 0) / 1000) * fps);
+					const itemFromFrame = Math.round(
+						((item.display?.from ?? 0) / 1000) * fps,
+					);
+					const itemToFrame = Math.round(
+						((item.display?.to ?? 0) / 1000) * fps,
+					);
 					if (frame < itemFromFrame || frame >= itemToFrame) return null;
 					return SequenceItem[item.type](item, {
 						fps,
@@ -280,7 +285,10 @@ const Composition = () => {
 					<TransitionSeries from={from} key={index}>
 						{group.map((item) => {
 							if (item.type === "transition") {
-								const durationInFrames = Math.max(1, Math.round((item.duration / 1000) * fps));
+								const durationInFrames = Math.max(
+									1,
+									Math.round((item.duration / 1000) * fps),
+								);
 								return Transitions[item.kind]({
 									durationInFrames,
 									...size,

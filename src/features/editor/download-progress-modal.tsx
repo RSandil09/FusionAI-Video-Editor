@@ -82,7 +82,9 @@ const DownloadProgressModal = () => {
 			if (!res.ok) throw new Error(data.error || "Thumbnail generation failed");
 			setThumbnailUrl(data.thumbnailUrl);
 		} catch (err) {
-			setThumbError(err instanceof Error ? err.message : "Failed to generate thumbnail");
+			setThumbError(
+				err instanceof Error ? err.message : "Failed to generate thumbnail",
+			);
 		} finally {
 			setGeneratingThumb(false);
 		}
@@ -175,16 +177,26 @@ const DownloadProgressModal = () => {
 										) : (
 											<ImageIcon className="h-4 w-4" />
 										)}
-										{generatingThumb ? "Generating thumbnail…" : "✨ Generate AI Thumbnail"}
+										{generatingThumb
+											? "Generating thumbnail…"
+											: "✨ Generate AI Thumbnail"}
 									</Button>
 								)}
 								{thumbError && (
-									<p className="text-xs text-destructive text-center">{thumbError}</p>
+									<p className="text-xs text-destructive text-center">
+										{thumbError}
+									</p>
 								)}
 								{thumbnailUrl && (
 									<div className="w-full space-y-2">
-										<p className="text-xs text-muted-foreground text-center font-medium">AI Thumbnail</p>
-										<a href={thumbnailUrl} target="_blank" rel="noopener noreferrer">
+										<p className="text-xs text-muted-foreground text-center font-medium">
+											AI Thumbnail
+										</p>
+										<a
+											href={thumbnailUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+										>
 											<img
 												src={thumbnailUrl}
 												alt="AI generated thumbnail"

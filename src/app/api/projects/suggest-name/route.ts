@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
 		}
 
 		const filenames = Array.isArray(body.filenames)
-			? (body.filenames as string[]).filter((f) => typeof f === "string").slice(0, 20)
+			? (body.filenames as string[])
+					.filter((f) => typeof f === "string")
+					.slice(0, 20)
 			: [];
 
 		if (filenames.length === 0) {

@@ -36,15 +36,21 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 		}
 
-		const projectId = typeof body.projectId === "string" ? body.projectId : null;
+		const projectId =
+			typeof body.projectId === "string" ? body.projectId : null;
 		if (!projectId) {
-			return NextResponse.json({ error: "projectId is required" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "projectId is required" },
+				{ status: 400 },
+			);
 		}
 
 		// 1. Fetch project
 		const { data: project, error: fetchErr } = await supabaseAdmin
 			.from("projects")
-			.select("id, name, editor_state, user_id, frame_rate, resolution_width, resolution_height")
+			.select(
+				"id, name, editor_state, user_id, frame_rate, resolution_width, resolution_height",
+			)
 			.eq("id", projectId)
 			.eq("user_id", user.id)
 			.maybeSingle();
@@ -55,7 +61,10 @@ export async function POST(request: NextRequest) {
 
 		const editorState = project.editor_state as Record<string, any> | null;
 		if (!editorState) {
-			return NextResponse.json({ error: "Project has no editor state" }, { status: 400 });
+			return NextResponse.json(
+				{ error: "Project has no editor state" },
+				{ status: 400 },
+			);
 		}
 
 		const fps = project.frame_rate ?? 30;
@@ -67,7 +76,9 @@ export async function POST(request: NextRequest) {
 		const bestFrameMs = await pickBestThumbnailFrame(editorState, duration);
 		const frameNumber = Math.round((bestFrameMs / 1000) * fps);
 
-		logger.log(`[thumbnail] Project ${projectId}: rendering frame ${frameNumber} (${bestFrameMs}ms)`);
+		logger.log(
+			`[thumbnail] Project ${projectId}: rendering frame ${frameNumber} (${bestFrameMs}ms)`,
+		);
 
 		// 3. Bundle + render still
 		const bundleLocation = await bundle({
@@ -121,7 +132,12 @@ export async function POST(request: NextRequest) {
 	} catch (error) {
 		logger.error("[thumbnail] Error:", error);
 		return NextResponse.json(
-			{ error: error instanceof Error ? error.message : "Thumbnail generation failed" },
+			{
+				error:
+					error instanceof Error
+						? error.message
+						: "Thumbnail generation failed",
+			},
 			{ status: 500 },
 		);
 	}
@@ -137,7 +153,8 @@ async function pickBestThumbnailFrame(
 ): Promise<number> {
 	const fallback = Math.round(durationMs * 0.15);
 	try {
-		const trackItemsMap = editorState.trackItemsMap as Record<string, any> ?? {};
+		const trackItemsMap =
+			(editorState.trackItemsMap as Record<string, any>) ?? {};
 		// Collect video clips with their display times
 		const videoClips = Object.values(trackItemsMap)
 			.filter((item: any) => item.type === "video")
@@ -170,7 +187,11 @@ Return ONLY valid JSON: { "timestampMs": 1500 }`;
 		const raw = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
 		const parsed = parseJsonResponse<{ timestampMs: number }>(raw);
 
-		if (typeof parsed?.timestampMs === "number" && parsed.timestampMs >= 0 && parsed.timestampMs < durationMs) {
+		if (
+			typeof parsed?.timestampMs === "number" &&
+			parsed.timestampMs >= 0 &&
+			parsed.timestampMs < durationMs
+		) {
 			return parsed.timestampMs;
 		}
 	} catch (err) {

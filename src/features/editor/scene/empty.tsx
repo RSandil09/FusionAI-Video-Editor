@@ -29,8 +29,7 @@ const SceneEmpty = () => {
 		setIsLoading(false);
 	}, [size]);
 
-	const onSelectFiles = (files: File[]) => {
-	};
+	const onSelectFiles = (files: File[]) => {};
 
 	return (
 		<div ref={containerRef} className="absolute z-50 flex h-full w-full flex-1">

@@ -15,7 +15,10 @@ const isDev = process.env.NODE_ENV === "development";
 function formatMessage(level: string, args: unknown[]): unknown[] {
 	if (isDev) return args;
 	// In production, prefix with a structured tag so log drains can filter.
-	const first = typeof args[0] === "string" ? `[${level.toUpperCase()}] ${args[0]}` : `[${level.toUpperCase()}]`;
+	const first =
+		typeof args[0] === "string"
+			? `[${level.toUpperCase()}] ${args[0]}`
+			: `[${level.toUpperCase()}]`;
 	return [first, ...args.slice(1)];
 }
 
