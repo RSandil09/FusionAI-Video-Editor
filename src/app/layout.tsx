@@ -1,4 +1,4 @@
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Inter, Space_Grotesk, Bricolage_Grotesque } from "next/font/google";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -23,6 +23,13 @@ const spaceGrotesk = Space_Grotesk({
 	variable: "--font-space-grotesk",
 	subsets: ["latin"],
 	display: "swap",
+});
+
+const bricolageGrotesque = Bricolage_Grotesque({
+	variable: "--font-bricolage",
+	subsets: ["latin"],
+	display: "swap",
+	weight: ["400", "600", "700", "800"],
 });
 
 import { BRANDING } from "@/config/branding";
@@ -56,7 +63,7 @@ export default async function RootLayout({
 				/>
 			</head>
 			<body
-				className={`${inter.variable} ${spaceGrotesk.variable} antialiased font-sans bg-background`}
+				className={`${inter.variable} ${spaceGrotesk.variable} ${bricolageGrotesque.variable} antialiased font-sans bg-background`}
 			>
 				<ThemeProvider>
 					<AuthProvider>

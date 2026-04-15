@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { getIdToken } from "@/lib/auth/client";
 import { OnboardingModal } from "./onboarding-modal";
+
+const MARKETING_PATHS = ["/"];
 
 async function fetchWithAuth(url: string, token: string) {
 	const res = await fetch(url, {
@@ -16,12 +19,14 @@ export function OnboardingProvider({
 	children,
 }: { children: React.ReactNode }) {
 	const { user } = useAuth();
+	const pathname = usePathname();
+	const isMarketingPage = MARKETING_PATHS.includes(pathname);
 	const [showOnboarding, setShowOnboarding] = useState(false);
 	const [connections, setConnections] = useState<{ provider: string }[]>([]);
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
-		if (!user) {
+		if (!user || isMarketingPage) {
 			setLoading(false);
 			return;
 		}

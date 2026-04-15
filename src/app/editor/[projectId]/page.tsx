@@ -105,10 +105,71 @@ function EditorContent() {
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center h-screen bg-background">
-				<div className="text-center">
-					<Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-					<p className="text-muted-foreground">Loading project...</p>
+			<div className="flex flex-col h-screen bg-[#0e0e0e] overflow-hidden">
+				{/* Toolbar skeleton */}
+				<div className="flex items-center justify-between px-4 h-12 border-b border-white/[0.06] shrink-0">
+					<div className="flex items-center gap-3">
+						<div className="h-6 w-6 rounded-lg bg-white/[0.06] animate-pulse" />
+						<div className="h-4 w-32 rounded-md bg-white/[0.06] animate-pulse" />
+					</div>
+					<div className="flex items-center gap-2">
+						{[48, 32, 56, 40].map((w, i) => (
+							<div key={i} className="h-7 rounded-lg bg-white/[0.06] animate-pulse" style={{ width: `${w}px`, animationDelay: `${i * 80}ms` }} />
+						))}
+					</div>
+					<div className="flex items-center gap-2">
+						<div className="h-7 w-20 rounded-lg bg-white/[0.06] animate-pulse" />
+						<div className="h-7 w-24 rounded-lg bg-[#ff6a00]/20 animate-pulse" />
+					</div>
+				</div>
+
+				{/* Main workspace */}
+				<div className="flex flex-1 overflow-hidden">
+					{/* Left panel skeleton */}
+					<div className="w-14 border-r border-white/[0.06] flex flex-col items-center py-3 gap-3 shrink-0">
+						{[...Array(6)].map((_, i) => (
+							<div key={i} className="h-9 w-9 rounded-xl bg-white/[0.06] animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+						))}
+					</div>
+
+					{/* Center canvas skeleton */}
+					<div className="flex-1 flex items-center justify-center bg-[#111]">
+						<div className="relative">
+							<div className="rounded-xl bg-[#1a1a1a] border border-white/[0.06] animate-pulse" style={{ width: "640px", height: "360px", maxWidth: "80vw", maxHeight: "50vh" }} />
+							<div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+								<Loader2 className="h-8 w-8 animate-spin text-[#ff6a00]" />
+								<p className="text-[#a0a0a0] text-sm font-medium">Loading project…</p>
+							</div>
+						</div>
+					</div>
+
+					{/* Right panel skeleton */}
+					<div className="w-64 border-l border-white/[0.06] p-4 flex flex-col gap-3 shrink-0">
+						<div className="h-4 w-24 rounded-md bg-white/[0.06] animate-pulse" />
+						{[...Array(5)].map((_, i) => (
+							<div key={i} className="h-8 rounded-lg bg-white/[0.06] animate-pulse" style={{ animationDelay: `${i * 70}ms` }} />
+						))}
+						<div className="h-px bg-white/[0.06] my-1" />
+						<div className="h-4 w-20 rounded-md bg-white/[0.06] animate-pulse" />
+						{[...Array(3)].map((_, i) => (
+							<div key={i} className="h-8 rounded-lg bg-white/[0.06] animate-pulse" style={{ animationDelay: `${i * 70 + 350}ms` }} />
+						))}
+					</div>
+				</div>
+
+				{/* Timeline skeleton */}
+				<div className="h-40 border-t border-white/[0.06] shrink-0 p-3 flex flex-col gap-2">
+					<div className="flex items-center gap-2 mb-1">
+						{[...Array(4)].map((_, i) => (
+							<div key={i} className="h-6 w-6 rounded-md bg-white/[0.06] animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+						))}
+					</div>
+					{[...Array(3)].map((_, i) => (
+						<div key={i} className="flex items-center gap-2">
+							<div className="h-8 w-16 rounded-md bg-white/[0.06] animate-pulse shrink-0" />
+							<div className="h-8 rounded-md bg-white/[0.06] animate-pulse flex-1" style={{ animationDelay: `${i * 80 + 100}ms` }} />
+						</div>
+					))}
 				</div>
 			</div>
 		);

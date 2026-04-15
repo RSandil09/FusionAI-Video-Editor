@@ -5,6 +5,7 @@
 @theme inline {
 	--font-sans: var(--font-inter), sans-serif;
 	--font-heading: var(--font-space-grotesk), sans-serif;
+	--font-display: var(--font-bricolage), sans-serif;
 
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
@@ -64,6 +65,17 @@
 			offset-distance: 100%;
 		}
 	}
+
+}
+
+@keyframes marquee {
+	0% { transform: translateX(0); }
+	100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-reverse {
+	0% { transform: translateX(-50%); }
+	100% { transform: translateX(0); }
 }
 
 :root {
@@ -157,7 +169,8 @@
 	}
 
 	body {
-		@apply bg-background text-foreground;
+		@apply bg-background text-foreground font-sans;
+		font-family: var(--font-inter), sans-serif;
 		letter-spacing: var(--tracking-normal);
 	}
 }

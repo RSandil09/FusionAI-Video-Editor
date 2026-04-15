@@ -55,6 +55,7 @@ export function ProjectCard({
 	const [isRenaming, setIsRenaming] = useState(false);
 	const [renameValue, setRenameValue] = useState(project.name);
 	const [isSaving, setIsSaving] = useState(false);
+	const [isNavigating, setIsNavigating] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const aspect = getAspectLabel(
@@ -67,7 +68,10 @@ export function ProjectCard({
 	});
 
 	const handleOpen = () => {
-		if (!isRenaming) router.push(`/editor/${project.id}`);
+		if (!isRenaming) {
+			setIsNavigating(true);
+			router.push(`/editor/${project.id}`);
+		}
 	};
 
 	const handleDelete = (e: React.MouseEvent) => {
@@ -249,12 +253,18 @@ export function ProjectCard({
 					<button
 						onClick={(e) => {
 							e.stopPropagation();
+							setIsNavigating(true);
 							router.push(`/editor/${project.id}`);
 						}}
-						className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6a00] hover:bg-[#ff7a1a] text-white text-xs font-semibold transition-colors"
+						disabled={isNavigating}
+						className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ff6a00] hover:bg-[#ff7a1a] text-white text-xs font-semibold transition-colors disabled:opacity-70"
 					>
-						<Play className="h-3 w-3 fill-white" />
-						Open
+						{isNavigating ? (
+							<div className="h-3 w-3 rounded-full border border-white/40 border-t-white animate-spin" />
+						) : (
+							<Play className="h-3 w-3 fill-white" />
+						)}
+						{isNavigating ? "Opening…" : "Open"}
 					</button>
 					<MenuButton />
 				</div>
@@ -284,11 +294,18 @@ export function ProjectCard({
 				)}
 
 				{/* Hover overlay */}
-				<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-					<div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2">
-						<Play className="h-3.5 w-3.5 text-white fill-white" />
-						<span className="text-white text-sm font-medium">Open</span>
-					</div>
+				<div className={`absolute inset-0 bg-black/50 transition-opacity flex items-center justify-center ${isNavigating ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+					{isNavigating ? (
+						<div className="flex flex-col items-center gap-2">
+							<div className="h-8 w-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+							<span className="text-white text-xs font-medium">Opening…</span>
+						</div>
+					) : (
+						<div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2">
+							<Play className="h-3.5 w-3.5 text-white fill-white" />
+							<span className="text-white text-sm font-medium">Open</span>
+						</div>
+					)}
 				</div>
 
 				{/* Badges */}
