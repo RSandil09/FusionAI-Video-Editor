@@ -285,6 +285,11 @@ const CaptionWords = ({
 		if (typeof topValue === "string") return topValue.replace("px", "");
 		return String(topValue);
 	});
+	const rawWidth = trackItem?.details.width as string | number | undefined;
+	const elementWidth = Number(
+		typeof rawWidth === "string" ? rawWidth.replace("px", "") : rawWidth || 0,
+	);
+
 	const [leftPosition, setLeftPosition] = useState<string>(() => {
 		const leftValue = trackItem?.details.left;
 		if (leftValue === undefined) {
@@ -304,12 +309,6 @@ const CaptionWords = ({
 		captionsTransitions: "none",
 		showObject: trackItem?.details?.showObject || "page",
 	});
-
-	const rawWidth = trackItem?.details.width as string | number | undefined;
-
-	const elementWidth = Number(
-		typeof rawWidth === "string" ? rawWidth.replace("px", "") : rawWidth || 0,
-	);
 	const popoverRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {

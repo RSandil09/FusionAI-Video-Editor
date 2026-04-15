@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# MCP config (may contain auth tokens)
+.mcp.json
+
 # dependencies
 /node_modules
 /.pnp
