@@ -1,6 +1,5 @@
 import { logger } from "@/lib/logger";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth/require-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes for large videos
@@ -64,11 +63,10 @@ async function fetchWithRetry(
  * Usage: /api/video-proxy?url=https://pub-xxx.r2.dev/path/to/video.mp4
  */
 export async function GET(request: NextRequest) {
-	const user = await requireAuth();
-	if (!user) {
-		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-	}
-
+	// No auth check — videos are on a public R2 bucket (already accessible without
+	// credentials). The URL allowlist below prevents SSRF. Auth would break the
+	// Remotion player iframe and the <video crossOrigin="anonymous"> metadata fetch
+	// inside @designcombo/state, both of which can't send the session cookie.
 	try {
 		const { searchParams } = new URL(request.url);
 		const videoUrl = searchParams.get("url");
@@ -237,11 +235,6 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function HEAD(request: NextRequest) {
-	const user = await requireAuth();
-	if (!user) {
-		return new NextResponse(null, { status: 401 });
-	}
-
 	try {
 		const { searchParams } = new URL(request.url);
 		const videoUrl = searchParams.get("url");
