@@ -1,11 +1,11 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
-import { startRenderJob } from "@/lib/remotion-renderer";
+import { startLambdaRender } from "@/lib/remotion-lambda-renderer";
 import { processAudioEffectsForRender } from "@/lib/ffmpeg-audio-processor";
-
 import { getUserFromRequest } from "@/lib/auth-helpers";
-import { createRender } from "@/lib/db/renders";
+import { createRender, updateRenderStatus } from "@/lib/db/renders";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { supabaseAdmin } from "@/lib/db/supabase-admin";
 
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -14,17 +14,14 @@ export async function POST(request: Request) {
 	try {
 		logger.log("🔵 /api/render POST request received");
 
-		// 1. Authenticate user
-		logger.log("🔵 Authenticating user...");
+		// 1. Authenticate
 		const user = await getUserFromRequest();
 		if (!user) {
-			logger.log("❌ Authentication failed - no user");
 			return NextResponse.json(
 				{ message: "Unauthorized - please log in" },
 				{ status: 401 },
 			);
 		}
-		logger.log("✅ User authenticated:", user.id);
 
 		const rl = await checkRateLimit(
 			`render:${user.id}`,
@@ -38,10 +35,20 @@ export async function POST(request: Request) {
 			);
 		}
 
-		// 2. Parse and validate request
-		const body = await request.json();
-		logger.log("🚀 Received render request from user:", user.id);
+		// 2. Validate Lambda configuration before accepting the job
+		if (!process.env.REMOTION_FUNCTION_NAME || !process.env.REMOTION_SERVE_URL) {
+			logger.error("❌ Lambda env vars not configured");
+			return NextResponse.json(
+				{
+					message:
+						"Render service is not configured. Set REMOTION_FUNCTION_NAME and REMOTION_SERVE_URL.",
+				},
+				{ status: 503 },
+			);
+		}
 
+		// 3. Parse request
+		const body = await request.json();
 		const { projectId, design, options } = body;
 
 		if (!projectId) {
@@ -51,29 +58,33 @@ export async function POST(request: Request) {
 			);
 		}
 
-		// Support both nested structure (from frontend) and flat structure (for testing)
 		const projectData = design || body;
 		const renderOptions = options || {};
+		const format = renderOptions.format ?? "mp4";
 
-		logger.log("📂 Processing projectData for project:", projectId);
-
-		// Extract project data
 		const {
 			trackItemsMap,
 			trackItemIds,
 			transitionsMap,
-			duration = 5000, // Default 5s if missing
+			duration = 5000,
 		} = projectData;
 
-		// Handle size separately to be safe
 		const size = projectData.size || { width: 1920, height: 1080 };
-
 		const fps = renderOptions.fps || projectData.fps || 30;
 		const width = size?.width || 1920;
 		const height = size?.height || 1080;
-		const durationInFrames = Math.floor((duration / 1000) * fps);
 
-		// Validate required fields
+		// Derive exact duration from track item display.to values — ground truth.
+		// This prevents extra black frames caused by stale or missing duration field.
+		const itemEndTimes: number[] = trackItemsMap
+			? Object.values(trackItemsMap)
+				.map((item: any) => item?.display?.to ?? 0)
+				.filter((t: number) => t > 0)
+			: [];
+		const contentDurationMs =
+			itemEndTimes.length > 0 ? Math.max(...itemEndTimes) : (duration ?? 5000);
+		const durationInFrames = Math.max(1, Math.ceil((contentDurationMs / 1000) * fps));
+
 		if (!trackItemsMap || !trackItemIds) {
 			return NextResponse.json(
 				{ message: "Missing required fields: trackItemsMap and trackItemIds" },
@@ -81,7 +92,7 @@ export async function POST(request: Request) {
 			);
 		}
 
-		// 3. Create render record in database
+		// 4. Create render record
 		const render = await createRender({
 			user_id: user.id,
 			project_id: projectId,
@@ -95,17 +106,18 @@ export async function POST(request: Request) {
 			);
 		}
 
-		logger.log(`✅ Render job ${render.id} created in database`);
+		logger.log(`✅ Render record ${render.id} created`);
 
-		// 3.5 Pre-process Audio Effects via FFMPEG locally
-		logger.log(`🎬 [${render.id}] Pre-processing Audio Effects...`);
+		// 5. Pre-process audio effects via FFmpeg
+		logger.log(`🎬 [${render.id}] Pre-processing audio effects...`);
 		const { updatedMap: processedTrackItemsMap, tempR2Keys } =
 			await processAudioEffectsForRender(trackItemsMap, render.id);
 
-		// 4. Start rendering in background
-		logger.log(`🎬 Starting render job ${render.id} in background...`);
+		// 6. Start Lambda render (non-blocking — returns immediately)
 		try {
-			startRenderJob(render.id, {
+			logger.log(`🚀 [${render.id}] Starting Lambda render...`);
+
+			const { lambdaRenderId, bucketName } = await startLambdaRender({
 				compositionId: "VideoEditor",
 				inputProps: {
 					trackItemsMap: processedTrackItemsMap,
@@ -118,27 +130,46 @@ export async function POST(request: Request) {
 				width,
 				height,
 				durationInFrames,
-				tempR2Keys,
+				outName: `renders/${render.id}.mp4`,
+				format,
 			});
-		} catch (renderError) {
-			logger.error(`❌ Failed to start render job:`, renderError);
-			// Don't fail the request - render will mark itself as failed
-			// Just log the error
+
+			// Store Lambda IDs in the render record so the polling route can use them
+			await supabaseAdmin
+				.from("renders")
+				.update({
+					status: "processing",
+					progress: 5,
+					lambda_render_id: lambdaRenderId,
+					lambda_bucket: bucketName,
+					// Store temp keys as storage_key (comma-separated) for cleanup
+					storage_key: tempR2Keys.length ? tempR2Keys.join(",") : null,
+				})
+				.eq("id", render.id);
+
+			logger.log(
+				`✅ [${render.id}] Lambda render started: lambdaRenderId=${lambdaRenderId}`,
+			);
+
+			return NextResponse.json(
+				{ renderId: render.id, status: "PROCESSING" },
+				{ status: 200 },
+			);
+		} catch (lambdaErr) {
+			const msg =
+				lambdaErr instanceof Error ? lambdaErr.message : String(lambdaErr);
+			logger.error(`❌ [${render.id}] Lambda start failed:`, msg);
+			await updateRenderStatus(render.id, {
+				status: "failed",
+				error_message: `Failed to start Lambda render: ${msg}`,
+			});
+			return NextResponse.json(
+				{ message: `Failed to start render: ${msg}` },
+				{ status: 500 },
+			);
 		}
-
-		logger.log(`✅ Render job ${render.id} started for project ${projectId}`);
-
-		// 5. Return render ID immediately (rendering continues in background)
-		return NextResponse.json(
-			{
-				renderId: render.id,
-				status: "PENDING",
-				message: "Render job started",
-			},
-			{ status: 200 },
-		);
 	} catch (error) {
-		logger.error("❌ Error starting render:", error);
+		logger.error("❌ Error in /api/render POST:", error);
 		return NextResponse.json(
 			{
 				message: "Failed to start render",

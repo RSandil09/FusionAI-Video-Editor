@@ -50,6 +50,7 @@
 		"@radix-ui/react-tooltip": "^1.2.6",
 		"@remotion/bundler": "4.0.315",
 		"@remotion/cli": "4.0.315",
+		"@remotion/lambda": "4.0.315",
 		"@remotion/media-utils": "4.0.315",
 		"@remotion/paths": "4.0.315",
 		"@remotion/player": "4.0.315",

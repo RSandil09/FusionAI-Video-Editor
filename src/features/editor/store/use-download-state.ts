@@ -2,6 +2,8 @@ import { IDesign } from "@designcombo/types";
 import { create } from "zustand";
 import { getIdToken } from "@/lib/auth/client";
 
+export type ExportFormat = "mp4" | "mp4-hevc" | "webm" | "gif" | "json";
+
 interface Output {
 	url: string;
 	type: string;
@@ -10,20 +12,22 @@ interface Output {
 interface DownloadState {
 	projectId: string;
 	exporting: boolean;
-	exportType: "json" | "mp4";
+	exportType: ExportFormat;
 	progress: number;
 	output?: Output;
 	payload?: IDesign;
 	displayProgressModal: boolean;
 	error?: string;
+	currentRenderId?: string;
 	actions: {
 		setProjectId: (projectId: string) => void;
 		setExporting: (exporting: boolean) => void;
-		setExportType: (exportType: "json" | "mp4") => void;
+		setExportType: (exportType: ExportFormat) => void;
 		setProgress: (progress: number) => void;
 		setState: (state: Partial<DownloadState>) => void;
 		setOutput: (output: Output) => void;
 		startExport: () => void;
+		cancelExport: () => Promise<void>;
 		setDisplayProgressModal: (displayProgressModal: boolean) => void;
 		clearError: () => void;
 	};
@@ -46,6 +50,29 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 		setDisplayProgressModal: (displayProgressModal) =>
 			set({ displayProgressModal }),
 		clearError: () => set({ error: undefined }),
+		cancelExport: async () => {
+			const { currentRenderId } = get();
+			if (!currentRenderId) {
+				set({ exporting: false, displayProgressModal: false });
+				return;
+			}
+			try {
+				const token = await getIdToken();
+				await fetch(`/api/render/${currentRenderId}`, {
+					method: "DELETE",
+					headers: token ? { Authorization: `Bearer ${token}` } : {},
+				});
+			} catch {
+				// best-effort
+			}
+			set({
+				exporting: false,
+				displayProgressModal: false,
+				currentRenderId: undefined,
+				error: undefined,
+				progress: 0,
+			});
+		},
 		startExport: async () => {
 			try {
 				set({
@@ -56,35 +83,41 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 					output: undefined,
 				});
 
-				const { payload, projectId } = get();
+				const { payload, projectId, exportType } = get();
 
 				if (!payload) {
-					console.error("❌ Payload is not defined in download state!");
 					throw new Error("Payload is not defined");
 				}
 
-				if (!projectId) {
-					console.warn("⚠️ ProjectId is not defined in download state!");
+				// JSON export — no render needed, just download the state
+				if (exportType === "json") {
+					const blob = new Blob([JSON.stringify(payload, null, 2)], {
+						type: "application/json",
+					});
+					const url = URL.createObjectURL(blob);
+					set({
+						exporting: false,
+						output: { url, type: "json" },
+					});
+					return;
 				}
 
-				// Get auth token
 				const token = await getIdToken();
 				if (!token) {
 					throw new Error("Not authenticated. Please log in to export.");
 				}
 
 				const requestBody = {
-					projectId: projectId,
+					projectId,
 					design: payload,
 					options: {
 						fps: 30,
 						size: payload.size,
-						format: "mp4",
+						format: exportType,
 					},
 				};
 
-				// Step 1: POST to start rendering
-				const response = await fetch(`/api/render`, {
+				const response = await fetch("/api/render", {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -95,11 +128,6 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 
 				if (!response.ok) {
 					const errorData = await response.json().catch(() => ({}));
-					console.error(
-						"❌ Export request failed:",
-						response.status,
-						errorData,
-					);
 					throw new Error(
 						errorData.message ||
 							`Failed to submit export request (${response.status})`,
@@ -110,17 +138,14 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 				const jobId = jobInfo.renderId;
 
 				if (!jobId) {
-					console.error("❌ No renderId in response:", jobInfo);
 					throw new Error("Render job created but no renderId returned");
 				}
 
-				// Step 2: Poll for status
+				set({ currentRenderId: jobId });
 
 				const checkStatus = async () => {
 					try {
-						// Refresh token for each poll (token could expire during long renders)
 						const pollToken = await getIdToken();
-
 						const statusResponse = await fetch(`/api/render/${jobId}`, {
 							headers: {
 								"Content-Type": "application/json",
@@ -135,34 +160,23 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 						}
 
 						const statusInfo = await statusResponse.json();
-						const {
-							status,
-							progress,
-							videoUrl: url,
-							error: renderError,
-						} = statusInfo;
+						const { status, progress, videoUrl: url, error: renderError } = statusInfo;
 
 						set({ progress: progress ?? 0 });
 
 						if (status === "COMPLETED") {
 							set({
 								exporting: false,
-								output: { url, type: get().exportType },
+								output: { url, type: exportType },
 							});
 						} else if (status === "FAILED") {
-							console.error("❌ Render failed:", renderError);
 							set({
 								exporting: false,
-								error:
-									renderError ||
-									"Render failed on the server. Check server logs.",
+								error: renderError || "Render failed on the server.",
 							});
 						} else if (status === "PROCESSING" || status === "PENDING") {
-							// Still in progress — poll again in 2.5s
-							setTimeout(checkStatus, 2500);
+							setTimeout(checkStatus, 5000);
 						} else {
-							// Unknown status — stop polling to prevent infinite loop
-							console.warn("⚠️ Unknown render status:", status);
 							set({
 								exporting: false,
 								error: `Unexpected render status: ${status}`,
@@ -170,10 +184,7 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 						}
 					} catch (pollError) {
 						const msg =
-							pollError instanceof Error
-								? pollError.message
-								: String(pollError);
-						console.error("❌ Polling error:", msg);
+							pollError instanceof Error ? pollError.message : String(pollError);
 						set({ exporting: false, error: msg });
 					}
 				};
@@ -181,7 +192,6 @@ export const useDownloadState = create<DownloadState>((set, get) => ({
 				checkStatus();
 			} catch (error) {
 				const msg = error instanceof Error ? error.message : String(error);
-				console.error("❌ Export error:", msg);
 				set({ exporting: false, error: msg });
 			}
 		},

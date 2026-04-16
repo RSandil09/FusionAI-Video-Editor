@@ -176,6 +176,8 @@ export interface Database {
 					started_at: string | null;
 					completed_at: string | null;
 					created_at: string;
+					lambda_render_id: string | null;
+					lambda_bucket: string | null;
 				};
 				Insert: {
 					id?: string;
@@ -192,6 +194,8 @@ export interface Database {
 					started_at?: string | null;
 					completed_at?: string | null;
 					created_at?: string;
+					lambda_render_id?: string | null;
+					lambda_bucket?: string | null;
 				};
 				Update: {
 					id?: string;
@@ -208,6 +212,8 @@ export interface Database {
 					started_at?: string | null;
 					completed_at?: string | null;
 					created_at?: string;
+					lambda_render_id?: string | null;
+					lambda_bucket?: string | null;
 				};
 				Relationships: [
 					{

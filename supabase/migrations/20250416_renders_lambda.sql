@@ -1,0 +1,2 @@
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS lambda_render_id TEXT;
+ALTER TABLE renders ADD COLUMN IF NOT EXISTS lambda_bucket TEXT;
