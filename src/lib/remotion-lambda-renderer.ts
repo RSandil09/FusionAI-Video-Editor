@@ -97,6 +97,12 @@ export async function startLambdaRender(
 		composition: config.compositionId,
 		inputProps: config.inputProps,
 		codec,
+		// Override composition defaults — without these Remotion falls back to the
+		// hardcoded values in remotion/index.tsx (300 frames = 10 s, 1080×1920).
+		durationInFrames: config.durationInFrames,
+		fps: config.fps,
+		width: config.width,
+		height: config.height,
 		...(isGif ? {} : {
 			crf: codec === "h265" ? 20 : 16,
 			pixelFormat: "yuv420p",
