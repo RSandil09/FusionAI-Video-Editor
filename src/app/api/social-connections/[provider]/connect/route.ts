@@ -48,14 +48,34 @@ export async function GET(
 		return NextResponse.redirect(url);
 	}
 
-	if (provider === "instagram" || provider === "tiktok") {
-		return NextResponse.json(
-			{
-				error: `${provider} OAuth not yet configured`,
-				hint: `Add ${provider.toUpperCase()}_CLIENT_ID and callback URL to your ${provider} developer app.`,
-			},
-			{ status: 501 },
-		);
+	if (provider === "tiktok") {
+		const clientKey = process.env.TIKTOK_CLIENT_KEY;
+		if (!clientKey) {
+			return NextResponse.json(
+				{ error: "TikTok connect not configured. Add TIKTOK_CLIENT_KEY to env." },
+				{ status: 503 },
+			);
+		}
+		const redirectUri = `${origin}/api/social-connections/tiktok/callback`;
+		const scope = "user.info.basic,video.upload,video.publish";
+		const state = buildSignedState(user.id);
+		const url = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientKey}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+		return NextResponse.redirect(url);
+	}
+
+	if (provider === "instagram") {
+		const clientId = process.env.INSTAGRAM_CLIENT_ID;
+		if (!clientId) {
+			return NextResponse.json(
+				{ error: "Instagram connect not configured. Add INSTAGRAM_CLIENT_ID to env." },
+				{ status: 503 },
+			);
+		}
+		const redirectUri = `${origin}/api/social-connections/instagram/callback`;
+		const scope = "instagram_basic,instagram_content_publish";
+		const state = buildSignedState(user.id);
+		const url = `https://api.instagram.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&state=${state}`;
+		return NextResponse.redirect(url);
 	}
 
 	return NextResponse.json({ error: "Invalid provider" }, { status: 400 });

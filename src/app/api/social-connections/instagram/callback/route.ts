@@ -21,8 +21,8 @@ function verifySignedState(state: string): { userId: string } | null {
 }
 
 /**
- * GET /api/social-connections/youtube/callback
- * OAuth callback for YouTube. Exchanges code for tokens and stores.
+ * GET /api/social-connections/instagram/callback
+ * OAuth callback for Instagram (Meta Graph API). Exchanges code for tokens and stores.
  */
 export async function GET(request: NextRequest) {
 	const { searchParams } = new URL(request.url);
@@ -34,10 +34,8 @@ export async function GET(request: NextRequest) {
 	const settingsUrl = `${origin}/settings?tab=connections`;
 
 	if (error) {
-		logger.error("YouTube OAuth error:", error);
-		return NextResponse.redirect(
-			`${settingsUrl}?error=${encodeURIComponent(error)}`,
-		);
+		logger.error("Instagram OAuth error:", error);
+		return NextResponse.redirect(`${settingsUrl}?error=${encodeURIComponent(error)}`);
 	}
 
 	if (!code || !state) {
@@ -50,60 +48,79 @@ export async function GET(request: NextRequest) {
 	}
 	const userId = stateData.userId;
 
-	const clientId = process.env.GOOGLE_CLIENT_ID;
-	const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+	const clientId = process.env.INSTAGRAM_CLIENT_ID;
+	const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
 	if (!clientId || !clientSecret) {
 		return NextResponse.redirect(`${settingsUrl}?error=server_config`);
 	}
 
-	const redirectUri = `${origin}/api/social-connections/youtube/callback`;
-	const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+	const redirectUri = `${origin}/api/social-connections/instagram/callback`;
+
+	// Exchange short-lived code for short-lived access token
+	const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
 		method: "POST",
 		headers: { "Content-Type": "application/x-www-form-urlencoded" },
 		body: new URLSearchParams({
-			code,
 			client_id: clientId,
 			client_secret: clientSecret,
-			redirect_uri: redirectUri,
 			grant_type: "authorization_code",
+			redirect_uri: redirectUri,
+			code,
 		}),
 	});
 
 	if (!tokenRes.ok) {
 		const err = await tokenRes.text();
-		logger.error("YouTube token exchange failed:", err);
+		logger.error("Instagram token exchange failed:", err);
 		return NextResponse.redirect(`${settingsUrl}?error=token_exchange`);
 	}
 
-	const tokens = await tokenRes.json();
-	const expiresAt = tokens.expires_in
-		? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-		: null;
+	const shortToken = await tokenRes.json();
 
-	const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-		headers: { Authorization: `Bearer ${tokens.access_token}` },
-	});
-	let providerUsername: string | null = null;
-	if (userRes.ok) {
-		const userInfo = await userRes.json();
-		providerUsername = userInfo.name || userInfo.email || null;
+	// Exchange short-lived token for long-lived token (60 days)
+	const longTokenRes = await fetch(
+		`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${clientSecret}&access_token=${shortToken.access_token}`,
+	);
+
+	let accessToken = shortToken.access_token;
+	let expiresAt: string | null = null;
+	if (longTokenRes.ok) {
+		const longToken = await longTokenRes.json();
+		accessToken = longToken.access_token;
+		expiresAt = longToken.expires_in
+			? new Date(Date.now() + longToken.expires_in * 1000).toISOString()
+			: null;
 	}
+
+	// Fetch user info
+	let providerUsername: string | null = null;
+	const providerUserId: string | null = shortToken.user_id?.toString() || null;
+	try {
+		const userRes = await fetch(
+			`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`,
+		);
+		if (userRes.ok) {
+			const userInfo = await userRes.json();
+			providerUsername = userInfo.username || null;
+		}
+	} catch {}
 
 	const result = await upsertSocialConnection({
 		user_id: userId,
-		provider: "youtube",
-		access_token: tokens.access_token,
-		refresh_token: tokens.refresh_token || null,
+		provider: "instagram",
+		access_token: accessToken,
+		refresh_token: null,
 		token_expires_at: expiresAt,
+		provider_user_id: providerUserId,
 		provider_username: providerUsername,
 	});
 
 	if (!result.success) {
-		logger.error("YouTube save_failed:", result.error);
+		logger.error("Instagram save_failed:", result.error);
 		return NextResponse.redirect(
 			`${settingsUrl}?error=save_failed&detail=${encodeURIComponent(result.error)}`,
 		);
 	}
 
-	return NextResponse.redirect(`${settingsUrl}?youtube=connected`);
+	return NextResponse.redirect(`${settingsUrl}?instagram=connected`);
 }

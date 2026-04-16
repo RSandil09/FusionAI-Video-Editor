@@ -3,8 +3,12 @@
  */
 
 import { logger } from "@/lib/logger";
-import { supabase } from "./supabase";
+import { supabaseAdmin } from "./supabase-admin";
 import type { Database } from "./database.types";
+
+// Use admin client throughout — these functions run server-side only
+// (OAuth callbacks, API routes) and need to bypass RLS.
+const supabase = supabaseAdmin;
 
 type SocialConnection =
 	Database["public"]["Tables"]["user_social_connections"]["Row"];
@@ -51,25 +55,24 @@ export async function getSocialConnection(
 
 export async function upsertSocialConnection(
 	data: SocialConnectionInsert,
-): Promise<SocialConnection | null> {
-	const { data: conn, error } = await supabase
+): Promise<{ success: true } | { success: false; error: string }> {
+	const { error } = await supabase
 		.from("user_social_connections")
 		.upsert(
 			{
 				...data,
 				is_active: true,
+				connected_at: new Date().toISOString(),
 				updated_at: new Date().toISOString(),
 			},
 			{ onConflict: "user_id,provider" },
-		)
-		.select()
-		.maybeSingle();
+		);
 
 	if (error) {
 		logger.error("Error upserting social connection:", error);
-		return null;
+		return { success: false, error: `${error.code}: ${error.message}` };
 	}
-	return conn ?? null;
+	return { success: true };
 }
 
 export async function disconnectSocial(
