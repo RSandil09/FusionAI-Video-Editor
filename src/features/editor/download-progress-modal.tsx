@@ -100,7 +100,8 @@ const DownloadProgressModal = () => {
 
 	const handleDownload = async () => {
 		if (output?.url) {
-			await download(output.url, "export.mp4");
+			const ext = output.type === "webm" ? "webm" : output.type === "gif" ? "gif" : "mp4";
+			await download(output.url, `export.${ext}`);
 		}
 	};
 
@@ -280,14 +281,24 @@ const DownloadProgressModal = () => {
 
 							<ProgressBar progress={progress} />
 
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={handleClose}
-								className="text-muted-foreground hover:text-foreground text-xs"
-							>
-								Minimise
-							</Button>
+							<div className="flex items-center gap-2">
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={handleClose}
+									className="text-muted-foreground hover:text-foreground text-xs"
+								>
+									Minimise
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => actions.cancelExport()}
+									className="text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
+								>
+									Cancel render
+								</Button>
+							</div>
 						</>
 					)}
 				</div>
