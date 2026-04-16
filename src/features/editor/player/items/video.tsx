@@ -16,13 +16,15 @@ function ensureVideoUrl(src: string): string {
 		return src.replace("/api/image-proxy", "/api/video-proxy");
 	}
 
-	// Absolute URL (e.g. direct R2 from render) - use as-is
-	if (src.startsWith("http://") || src.startsWith("https://")) {
-		return src;
-	}
-
+	// Proxy R2 URLs before the generic https check — absolute R2 URLs need the proxy
+	// for authenticated playback, just like relative proxy paths do.
 	if (src.includes(".r2.dev")) {
 		return `/api/video-proxy?url=${encodeURIComponent(src)}`;
+	}
+
+	// Other absolute URLs (e.g. external CDNs used during Lambda render) — use as-is
+	if (src.startsWith("http://") || src.startsWith("https://")) {
+		return src;
 	}
 
 	return src;

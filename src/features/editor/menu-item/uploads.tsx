@@ -140,10 +140,20 @@ export const Uploads = () => {
 
 	// ── handlers ────────────────────────────────────────────────────────────────
 	const handleAddVideo = (upload: any) => {
-		const src = upload.result?.url || upload.url;
+		let src = upload.result?.url || upload.url;
 		if (!src) {
 			console.warn("⚠️ No src found for video upload");
 			return;
+		}
+		// @designcombo/state's ADD_VIDEO handler creates a <video crossOrigin="anonymous">
+		// element to fetch metadata (duration/width/height). crossOrigin="anonymous" omits
+		// credentials, so the video-proxy's auth check returns 401 in production.
+		// Fix: pass the raw R2 URL so Dn() fetches from the public CDN directly (no auth).
+		// ensureVideoUrl() in the player will proxy it back for playback.
+		if (src.startsWith("/api/video-proxy?url=")) {
+			src = decodeURIComponent(src.slice("/api/video-proxy?url=".length));
+		} else if (src.startsWith("/api/image-proxy?url=")) {
+			src = decodeURIComponent(src.slice("/api/image-proxy?url=".length));
 		}
 		const payload = {
 			id: generateId(),
