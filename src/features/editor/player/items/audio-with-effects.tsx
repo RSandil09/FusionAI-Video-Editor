@@ -26,6 +26,7 @@ export const AudioWithEffects = ({
 	volume,
 	playbackRate,
 	effects,
+	durationInSeconds,
 }: {
 	src: string;
 	startFrom?: number;
@@ -33,6 +34,8 @@ export const AudioWithEffects = ({
 	volume: number;
 	playbackRate: number;
 	effects?: any;
+	/** Pre-computed duration so Remotion skips its internal network fetch */
+	durationInSeconds?: number;
 }) => {
 	const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -242,15 +245,29 @@ export const AudioWithEffects = ({
 		};
 	}, [src, effects]);
 
+	// Only attach the ref when Web Audio effects are actually active.
+	// Remotion's AudioForRendering sets needsToRenderAudioTag = (ref || loop),
+	// which triggers delayRender("Loading <Audio> duration...") and forces a
+	// network fetch to measure the audio file. Without a ref, Remotion skips
+	// this fetch entirely and audio is still composed by Lambda's audio pipeline.
+	const hasActiveEffects =
+		effects &&
+		effects.active &&
+		(effects.eq?.active ||
+			effects.compressor?.active ||
+			effects.delay?.active ||
+			effects.reverb?.active);
+
 	return (
 		<RemotionAudio
-			ref={audioRef as any}
+			ref={hasActiveEffects ? (audioRef as any) : undefined}
 			startFrom={startFrom}
 			endAt={endAt}
 			playbackRate={playbackRate}
 			src={src}
 			volume={volume}
 			crossOrigin="anonymous"
+			{...(durationInSeconds !== undefined ? { durationInSeconds } : {})}
 		/>
 	);
 };

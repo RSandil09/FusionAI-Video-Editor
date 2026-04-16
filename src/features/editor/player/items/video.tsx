@@ -56,6 +56,18 @@ export const Video = ({
 	// Use proxy URL - same URL that works when opened in new tab
 	const videoSrc = ensureVideoUrl(details.src);
 
+	// Pre-compute source duration so Remotion skips its internal network fetch.
+	// Without this, Remotion calls delayRender() to measure the video duration,
+	// which times out inside Lambda when fetching from R2.
+	const trimEndMs = item.trim?.to ?? 0;
+	const displayDurationMs = (item.display?.to ?? 0) - (item.display?.from ?? 0);
+	const sourceDurationSec = trimEndMs > 0
+		? trimEndMs / 1000
+		: displayDurationMs / 1000 / playbackRate;
+	const endAtFrames = trimEndMs > 0
+		? (trimEndMs / 1000) * fps
+		: (displayDurationMs / 1000 / playbackRate) * fps;
+
 	const children = (
 		<BoxAnim
 			style={calculateContainerStyles(details, crop, {
@@ -79,10 +91,11 @@ export const Video = ({
 					<div style={calculateMediaStyles(details, crop)}>
 						<RemotionVideo
 							startFrom={((item.trim?.from ?? 0) / 1000) * fps}
-							endAt={((item.trim?.to ?? 0) / 1000) * fps || 1 / fps}
+							endAt={endAtFrames}
 							playbackRate={playbackRate}
 							src={videoSrc}
 							volume={muteAudio ? 0 : (details.volume || 0) / 100}
+							durationInSeconds={Math.max(sourceDurationSec, 1)}
 							onError={(e) => {
 								console.error("Video playback error:", e, "URL:", videoSrc);
 							}}
