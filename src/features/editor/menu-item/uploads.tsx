@@ -138,28 +138,72 @@ export const Uploads = () => {
 	const hasFailed = failedUploads.length > 0;
 	const hasAssets = videos.length > 0 || images.length > 0 || audios.length > 0;
 
+	// ── helpers ─────────────────────────────────────────────────────────────────
+
+	/**
+	 * Load video metadata without crossOrigin="anonymous".
+	 *
+	 * @designcombo/state's internal Dn() always sets crossOrigin="anonymous" which
+	 * omits cookies, causing the video-proxy auth check to return 401 in production.
+	 * We pre-fetch duration/width/height ourselves using a plain <video> element
+	 * (credentials sent normally) so the library skips Dn() entirely when all three
+	 * values are present in the payload.
+	 */
+	const getVideoMetadata = (
+		src: string,
+	): Promise<{ duration: number; width: number; height: number }> =>
+		new Promise((resolve, reject) => {
+			const video = document.createElement("video");
+			video.preload = "metadata";
+			video.onloadedmetadata = () => {
+				resolve({
+					duration: video.duration * 1000, // library expects ms
+					width: video.videoWidth,
+					height: video.videoHeight,
+				});
+				video.src = "";
+			};
+			video.onerror = reject;
+			// Use proxied URL so the auth cookie is sent (no crossOrigin = credentials included)
+			video.src = src.startsWith("/api/video-proxy") ? src : src.includes(".r2.dev") ? `/api/video-proxy?url=${encodeURIComponent(src)}` : src;
+			video.load();
+		});
+
 	// ── handlers ────────────────────────────────────────────────────────────────
-	const handleAddVideo = (upload: any) => {
-		let src = upload.result?.url || upload.url;
-		if (!src) {
+	const handleAddVideo = async (upload: any) => {
+		const rawSrc = upload.result?.url || upload.url;
+		if (!rawSrc) {
 			console.warn("⚠️ No src found for video upload");
 			return;
 		}
-		// @designcombo/state's ADD_VIDEO handler creates a <video crossOrigin="anonymous">
-		// element to fetch metadata (duration/width/height). crossOrigin="anonymous" omits
-		// credentials, so the video-proxy's auth check returns 401 in production.
-		// Fix: pass the raw R2 URL so Dn() fetches from the public CDN directly (no auth).
-		// ensureVideoUrl() in the player will proxy it back for playback.
+
+		// Ensure we have the direct R2 URL for details.src (player proxies at render time)
+		let src = rawSrc;
 		if (src.startsWith("/api/video-proxy?url=")) {
 			src = decodeURIComponent(src.slice("/api/video-proxy?url=".length));
 		} else if (src.startsWith("/api/image-proxy?url=")) {
 			src = decodeURIComponent(src.slice("/api/image-proxy?url=".length));
 		}
+
+		// Pre-fetch metadata so @designcombo/state skips its crossOrigin="anonymous"
+		// video element fetch (which omits cookies and fails auth in production).
+		let meta: { duration: number; width: number; height: number } | undefined;
+		try {
+			meta = await getVideoMetadata(rawSrc);
+		} catch {
+			console.warn("⚠️ Could not pre-fetch video metadata, ADD_VIDEO may fail");
+		}
+
 		const payload = {
 			id: generateId(),
-			details: { src },
+			details: {
+				src,
+				...(meta && { width: meta.width, height: meta.height }),
+			},
+			...(meta && { duration: meta.duration }),
 			metadata: { previewUrl: src },
 		};
+
 		dispatch(ADD_VIDEO, {
 			payload,
 			options: { resourceId: "main", scaleMode: "fit" },
