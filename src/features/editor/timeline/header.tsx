@@ -40,6 +40,7 @@ import { useIsLargeScreen } from "@/hooks/use-media-query";
 import { useTimelineOffsetX } from "../hooks/use-timeline-offset";
 import type { ToolMode } from "./engine/types";
 import { cn } from "@/lib/utils";
+import StateManager from "@designcombo/state";
 
 const IconPlayerPlayFilled = ({ size }: { size: number }) => (
 	<svg
@@ -115,10 +116,10 @@ const TOOL_BUTTONS: {
 	{ mode: "marker", icon: <MapPin size={13} />, title: "Marker (M)", key: "M" },
 ];
 
-const Header = () => {
+const Header = ({ stateManager }: { stateManager?: StateManager }) => {
 	const [playing, setPlaying] = useState(false);
 	const [toolMode, setToolModeState] = useState<ToolMode>("select");
-	const { duration, fps, scale, playerRef, activeIds, timeline } = useStore();
+	const { duration, fps, scale, playerRef, activeIds, trackItemsMap, timeline } = useStore();
 
 	const handleToolMode = (mode: ToolMode) => {
 		setToolModeState(mode);
@@ -155,10 +156,31 @@ const Header = () => {
 	const currentFrame = useCurrentPlayerFrame(playerRef);
 
 	const doActiveDelete = () => {
-		// Pass trackItemIds explicitly — StateManager's delete handler uses
-		// payload.trackItemIds when present, otherwise falls back to its internal
-		// activeIds which may be stale. Passing them directly is always reliable.
-		dispatch(LAYER_DELETE, { payload: { trackItemIds: activeIds } });
+		// The StateManager's Ui() delete handler iterates e.transitionIds and
+		// accesses e.transitionsMap[id].fromId on every entry. If transitionIds
+		// contains stale IDs that no longer exist in transitionsMap (which can
+		// happen after moves, splits, or partial state rehydration), it crashes
+		// with "Cannot read properties of undefined (reading 'fromId')".
+		//
+		// Fix: sanitize the StateManager's internal transitionIds before dispatch
+		// so every ID it iterates is guaranteed to exist in transitionsMap.
+		if (stateManager) {
+			const smState = stateManager.getState();
+			const validTransitionIds = (smState.transitionIds as string[]).filter(
+				(id) => !!smState.transitionsMap[id],
+			);
+			if (validTransitionIds.length !== smState.transitionIds.length) {
+				stateManager.updateState(
+					{ transitionIds: validTransitionIds },
+					{ updateHistory: false },
+				);
+			}
+		}
+
+		// Also filter the payload to only real track item IDs (not transition IDs).
+		const trackItemIds = activeIds.filter((id) => !!trackItemsMap[id]);
+		if (!trackItemIds.length) return;
+		dispatch(LAYER_DELETE, { payload: { trackItemIds } });
 	};
 
 	const doActiveSplit = () => {

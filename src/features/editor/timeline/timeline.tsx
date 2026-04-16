@@ -312,7 +312,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 			className="bg-background relative h-full w-full overflow-hidden flex flex-col"
 		>
 			{/* Header */}
-			<Header />
+			<Header stateManager={stateManager} />
 
 			{/* Ruler */}
 			<Ruler
