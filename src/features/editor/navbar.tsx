@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { dispatch } from "@designcombo/events";
 import { HISTORY_UNDO, HISTORY_REDO, DESIGN_RESIZE } from "@designcombo/state";
@@ -18,6 +18,7 @@ import {
 	ArrowLeft,
 	CheckCircle2,
 	AlertCircle,
+	ExternalLink,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { getIdToken } from "@/lib/auth/client";
@@ -28,15 +29,12 @@ import { useRouter } from "next/navigation";
 import type StateManager from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
 import type { IDesign } from "@designcombo/types";
-import { useDownloadState } from "./store/use-download-state";
+import { useDownloadState, type ExportFormat } from "./store/use-download-state";
+import useStore from "./store/use-store";
 import DownloadProgressModal from "./download-progress-modal";
 import AutosizeInput from "@/components/ui/autosize-input";
 
-import {
-	useIsLargeScreen,
-	useIsMediumScreen,
-	useIsSmallScreen,
-} from "@/hooks/use-media-query";
+import { useIsMediumScreen } from "@/hooks/use-media-query";
 
 import { LogoIcons } from "@/components/shared/logos";
 import Link from "next/link";
@@ -44,14 +42,13 @@ import Link from "next/link";
 import type { SaveStatus } from "./editor";
 
 export default function Navbar({
-	user,
 	stateManager,
 	setProjectName,
 	projectName,
 	projectId,
 	saveStatus = "idle",
 }: {
-	user: any | null;
+	user?: any | null;
 	stateManager: StateManager;
 	setProjectName: (name: string) => void;
 	projectName: string;
@@ -61,9 +58,6 @@ export default function Navbar({
 	const [title, setTitle] = useState(projectName);
 	const [isRenamingSaving, setIsRenamingSaving] = useState(false);
 	const router = useRouter();
-	const isLargeScreen = useIsLargeScreen();
-	const isMediumScreen = useIsMediumScreen();
-	const isSmallScreen = useIsSmallScreen();
 
 	// Sync local title when prop changes (e.g. on first DB load)
 	useEffect(() => {
@@ -77,8 +71,6 @@ export default function Navbar({
 	const handleRedo = () => {
 		dispatch(HISTORY_REDO);
 	};
-
-	const handleCreateProject = async () => {};
 
 	const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setTitle(e.target.value);
@@ -234,6 +226,7 @@ export default function Navbar({
 			<div className="flex h-16 items-center justify-end gap-3">
 				<div className="flex items-center gap-2">
 					<SaveButton projectId={projectId} stateManager={stateManager} />
+					<PublishPopover />
 					<DownloadPopover stateManager={stateManager} projectId={projectId} />
 				</div>
 
@@ -245,22 +238,202 @@ export default function Navbar({
 	);
 }
 
+// ─── Publish / Share ────────────────────────────────────────────────────────
+
+type SocialConnection = {
+	provider: string;
+	provider_username: string | null;
+	connected_at: string | null;
+};
+
+const PLATFORMS: { id: string; label: string; dot: string }[] = [
+	{ id: "youtube", label: "YouTube", dot: "bg-red-500" },
+	{ id: "tiktok", label: "TikTok", dot: "bg-zinc-800 dark:bg-zinc-200" },
+	{ id: "instagram", label: "Instagram", dot: "bg-pink-500" },
+];
+
+const PublishPopover = () => {
+	const [open, setOpen] = useState(false);
+	const [connections, setConnections] = useState<SocialConnection[]>([]);
+	const [loading, setLoading] = useState(false);
+
+	const fetchConnections = useCallback(async () => {
+		setLoading(true);
+		try {
+			const token = await getIdToken();
+			if (!token) return;
+			const res = await fetch("/api/social-connections", {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			if (res.ok) {
+				const data = await res.json();
+				setConnections(data);
+			}
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+
+	useEffect(() => {
+		if (open) fetchConnections();
+	}, [open, fetchConnections]);
+
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button
+					className="flex h-8 gap-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+					variant="ghost"
+					size="sm"
+				>
+					<ShareIcon width={14} />
+					<span className="hidden md:block text-xs font-medium">Publish</span>
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent
+				align="end"
+				className="bg-sidebar z-[250] flex w-64 flex-col gap-3 rounded-2xl border-border/60 p-4"
+			>
+				<div className="flex items-center gap-2">
+					<ShareIcon width={13} className="text-primary" />
+					<Label className="text-sm font-semibold">Publish to</Label>
+				</div>
+
+				{loading ? (
+					<div className="flex justify-center py-4">
+						<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+					</div>
+				) : (
+					<div className="flex flex-col gap-2">
+						{PLATFORMS.map((platform) => {
+							const conn = connections.find((c) => c.provider === platform.id);
+							return (
+								<div
+									key={platform.id}
+									className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 px-3 py-2.5"
+								>
+									<div className="flex items-center gap-2.5">
+										<div className={`h-2 w-2 rounded-full ${platform.dot}`} />
+										<div>
+											<div className="text-sm font-medium">{platform.label}</div>
+											{conn?.provider_username && (
+												<div className="text-xs text-muted-foreground">
+													@{conn.provider_username}
+												</div>
+											)}
+										</div>
+									</div>
+									{conn ? (
+										<Button
+											size="sm"
+											className="h-7 rounded-lg px-3 text-xs"
+											onClick={() =>
+												toast.info(`Publishing to ${platform.label} coming soon`)
+											}
+										>
+											Publish
+										</Button>
+									) : (
+										<Link
+											href="/settings?tab=connections"
+											onClick={() => setOpen(false)}
+											className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+										>
+											Connect <ExternalLink width={10} />
+										</Link>
+									)}
+								</div>
+							);
+						})}
+					</div>
+				)}
+
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					Connect accounts in{" "}
+					<Link
+						href="/settings?tab=connections"
+						className="text-primary hover:underline"
+						onClick={() => setOpen(false)}
+					>
+						Settings
+					</Link>{" "}
+					to publish directly.
+				</p>
+			</PopoverContent>
+		</Popover>
+	);
+};
+
+// ─── Export ─────────────────────────────────────────────────────────────────
+
+const EXPORT_FORMATS: {
+	id: ExportFormat;
+	label: string;
+	description: string;
+	badge?: string;
+	badgeColor?: string;
+}[] = [
+	{
+		id: "mp4",
+		label: "MP4 — H.264",
+		description: "Works everywhere, social media ready",
+		badge: "Recommended",
+		badgeColor: "bg-primary/15 text-primary",
+	},
+	{
+		id: "mp4-hevc",
+		label: "MP4 — H.265",
+		description: "Same quality, ~50% smaller file",
+		badge: "Best quality",
+		badgeColor: "bg-green-500/15 text-green-500",
+	},
+	{
+		id: "webm",
+		label: "WebM — VP9",
+		description: "Optimised for web embedding",
+	},
+	{
+		id: "gif",
+		label: "GIF",
+		description: "Short clips only, no audio",
+	},
+	{
+		id: "json",
+		label: "JSON",
+		description: "Export raw project data",
+	},
+];
+
 const DownloadPopover = ({
 	stateManager,
 	projectId,
 }: { stateManager: StateManager; projectId?: string }) => {
 	const isMediumScreen = useIsMediumScreen();
 	const { actions, exportType } = useDownloadState();
+	const { duration, tracks } = useStore();
 	const [isExportTypeOpen, setIsExportTypeOpen] = useState(false);
 	const [open, setOpen] = useState(false);
 
+	const selectedFormat = EXPORT_FORMATS.find((f) => f.id === exportType) ?? EXPORT_FORMATS[0];
+
 	const handleExport = () => {
+		// Recompute trackItemIds from the live Zustand tracks array so the
+		// exported render order always matches the current timeline visual order.
+		// This corrects stale trackItemIds in projects saved before the drag-fix
+		// AND ensures the Lambda composition renders the same z-order as the preview.
+		// tracks[0] = top track = renders last (highest z-index) → reverse then flatten.
+		const trackItemIds = [...tracks]
+			.reverse()
+			.flatMap((t: any) => (t.items ?? t.trackItemIds ?? []) as string[]);
+
 		const data: IDesign = {
 			id: generateId(),
 			...stateManager.toJSON(),
+			// Explicitly include duration from Zustand store — toJSON() may omit it
+			duration,
+			// Override with freshly recomputed order — never trust persisted trackItemIds
+			trackItemIds,
 		};
-
-		// Set projectId and payload in state before starting export
 		if (projectId) {
 			actions.setProjectId(projectId);
 		} else {
@@ -268,6 +441,7 @@ const DownloadPopover = ({
 		}
 		actions.setState({ payload: data });
 		actions.startExport();
+		setOpen(false);
 	};
 
 	return (
@@ -277,57 +451,65 @@ const DownloadPopover = ({
 					className="flex h-7 gap-1 border border-border"
 					size={isMediumScreen ? "sm" : "icon"}
 				>
-					<Download width={18} />{" "}
+					<Download width={18} />
 					<span className="hidden md:block">Export</span>
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent
 				align="end"
-				className="bg-sidebar z-[250] flex w-60 flex-col gap-4 rounded-2xl border-border/60"
+				className="bg-sidebar z-[250] flex w-72 flex-col gap-4 rounded-2xl border-border/60 p-4"
 			>
-				<Label>Export settings</Label>
+				<Label className="text-sm font-semibold">Export settings</Label>
 
+				{/* Format selector */}
 				<Popover open={isExportTypeOpen} onOpenChange={setIsExportTypeOpen}>
 					<PopoverTrigger asChild>
 						<Button
-							className="w-full justify-between rounded-xl"
+							className="w-full justify-between rounded-xl h-auto py-2.5 px-3"
 							variant="outline"
 						>
-							<div>{exportType.toUpperCase()}</div>
-							<ChevronDown width={16} />
+							<div className="text-left">
+								<div className="text-sm font-medium">{selectedFormat.label}</div>
+								<div className="text-xs text-muted-foreground">{selectedFormat.description}</div>
+							</div>
+							<ChevronDown width={14} className="shrink-0 ml-2 text-muted-foreground" />
 						</Button>
 					</PopoverTrigger>
 					<PopoverContent className="bg-background z-[251] w-[--radix-popover-trigger-width] px-2 py-2 rounded-xl">
-						<div
-							className="flex h-8 items-center rounded-lg px-3 text-sm hover:cursor-pointer hover:bg-muted/60"
-							onClick={() => {
-								actions.setExportType("mp4");
-								setIsExportTypeOpen(false);
-							}}
-						>
-							MP4
-						</div>
-						<div
-							className="flex h-8 items-center rounded-lg px-3 text-sm hover:cursor-pointer hover:bg-muted/60"
-							onClick={() => {
-								actions.setExportType("json");
-								setIsExportTypeOpen(false);
-							}}
-						>
-							JSON
-						</div>
+						{EXPORT_FORMATS.map((fmt) => (
+							<div
+								key={fmt.id}
+								className={`flex items-center justify-between rounded-lg px-3 py-2 hover:cursor-pointer hover:bg-muted/60 transition-colors ${
+									exportType === fmt.id ? "bg-muted/40" : ""
+								}`}
+								onClick={() => {
+									actions.setExportType(fmt.id);
+									setIsExportTypeOpen(false);
+								}}
+							>
+								<div>
+									<div className="text-sm font-medium">{fmt.label}</div>
+									<div className="text-xs text-muted-foreground">{fmt.description}</div>
+								</div>
+								{fmt.badge && (
+									<span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ml-2 shrink-0 ${fmt.badgeColor}`}>
+										{fmt.badge}
+									</span>
+								)}
+							</div>
+						))}
 					</PopoverContent>
 				</Popover>
 
-				<div>
-					<Button onClick={handleExport} className="w-full">
-						Export
-					</Button>
-				</div>
+				<Button onClick={handleExport} className="w-full rounded-xl">
+					Export {selectedFormat.label.split("—")[0].trim()}
+				</Button>
 			</PopoverContent>
 		</Popover>
 	);
 };
+
+// ─── Resize (kept for future use) ───────────────────────────────────────────
 
 interface ResizeOptionProps {
 	label: string;
@@ -347,50 +529,31 @@ const RESIZE_OPTIONS: ResizeOptionProps[] = [
 		label: "16:9",
 		icon: "landscape",
 		description: "YouTube ads",
-		value: {
-			width: 1920,
-			height: 1080,
-			name: "16:9",
-		},
+		value: { width: 1920, height: 1080, name: "16:9" },
 	},
 	{
 		label: "9:16",
 		icon: "portrait",
 		description: "TikTok, YouTube Shorts",
-		value: {
-			width: 1080,
-			height: 1920,
-			name: "9:16",
-		},
+		value: { width: 1080, height: 1920, name: "9:16" },
 	},
 	{
 		label: "1:1",
 		icon: "square",
 		description: "Instagram, Facebook posts",
-		value: {
-			width: 1080,
-			height: 1080,
-			name: "1:1",
-		},
+		value: { width: 1080, height: 1080, name: "1:1" },
 	},
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ResizeVideo = () => {
 	const handleResize = (options: ResizeValue) => {
-		dispatch(DESIGN_RESIZE, {
-			payload: {
-				...options,
-			},
-		});
+		dispatch(DESIGN_RESIZE, { payload: { ...options } });
 	};
 	return (
 		<Popover>
 			<PopoverTrigger asChild>
-				<Button
-					className="z-10 h-8 gap-2 rounded-xl"
-					variant="outline"
-					size={"sm"}
-				>
+				<Button className="z-10 h-8 gap-2 rounded-xl" variant="outline" size="sm">
 					<ProportionsIcon className="h-4 w-4" />
 					<div>Resize</div>
 				</Button>
@@ -436,6 +599,9 @@ const ResizeOption = ({
 		</div>
 	);
 };
+
+// ─── Save ────────────────────────────────────────────────────────────────────
+
 const SaveButton = ({
 	projectId,
 	stateManager,
@@ -461,7 +627,6 @@ const SaveButton = ({
 				console.warn("⚠️ trackItemIds is missing in state to save");
 			}
 
-			// Get auth token for the API call
 			const token = await getIdToken();
 			if (!token) {
 				toast.error("Not authenticated. Please log in.");
@@ -479,7 +644,6 @@ const SaveButton = ({
 					body: JSON.stringify({ editor_state: state }),
 				});
 			} catch (fetchErr) {
-				// Network-level failure (no internet, CORS, server not running)
 				const msg =
 					fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
 				console.error("❌ Fetch failed (network error):", msg);

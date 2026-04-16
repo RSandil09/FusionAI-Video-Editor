@@ -106,6 +106,17 @@ const Editor = ({
 					id: saved.id || defaults.id,
 				};
 
+				// Recompute trackItemIds from the live tracks array so any project
+				// saved with stale z-order (before the drag fix) is corrected on load.
+				// tracks[0] = top track = renders last = highest z-index → reverse then flatten.
+				// Only recompute when tracks actually have items so empty projects are unaffected.
+				const recomputedIds = [...(merged.tracks as any[])]
+					.reverse()
+					.flatMap((t: any) => (t.items ?? t.trackItemIds ?? []) as string[]);
+				if (recomputedIds.length > 0) {
+					merged.trackItemIds = recomputedIds;
+				}
+
 				if (validateEditorState(merged)) {
 					editorState = merged;
 				} else {

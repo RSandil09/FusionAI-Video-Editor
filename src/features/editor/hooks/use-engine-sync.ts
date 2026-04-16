@@ -132,9 +132,22 @@ export function buildEngineCallbacks(
 				0,
 				...Object.values(updatedMap).map((item: any) => item.display?.to ?? 0),
 			);
+
+			// Recompute trackItemIds so render order (z-index) reflects the new track
+			// arrangement. trackItemIds order determines JSX render order in
+			// composition.tsx: the LAST entry renders on top.  tracks[0] is the top
+			// (visually highest) track, so its items must appear last in the array.
+			// Reversing newTracks gives: bottom-track items first, top-track items last.
+			const newTrackItemIds = [...newTracks]
+				.reverse()
+				.flatMap(
+					(t: any) => (t.items ?? t.trackItemIds ?? []) as string[],
+				);
+
 			stateManager.updateState(
 				{
 					tracks: newTracks,
+					trackItemIds: newTrackItemIds,
 					trackItemsMap: updatedMap,
 					transitionsMap: newTransitionsMap,
 					duration: newDuration || current.duration,

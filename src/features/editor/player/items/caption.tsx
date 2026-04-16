@@ -37,7 +37,10 @@ export default function Caption({
 	const { from, durationInFrames } = calculateFrames(item.display, fps);
 	const currentFrame = (frame || 0) - (item.display.from * fps) / 1000;
 	const [firstWord] = details.words;
-	const offsetFrom = display.from - firstWord.start;
+	// Guard: if words array is empty (malformed caption state), treat offset as 0
+	// rather than crashing on firstWord.start — this can happen if AI captioning
+	// fails or the item is created without words, and would crash the Lambda render.
+	const offsetFrom = firstWord ? display.from - firstWord.start : 0;
 
 	// Calculate scale factor and update details
 	const updatedDetails = calculateUpdatedDetails(details);

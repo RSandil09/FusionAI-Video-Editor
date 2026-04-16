@@ -162,7 +162,10 @@ export async function processAudioEffectsForRender(
 	const processingPromises = Object.values(updatedMap)
 		.filter(
 			(item) =>
-				(item.type === "audio" || item.details?.src) &&
+				// Only process audio items — the original condition included
+				// `item.details?.src` which is also truthy for video items, causing
+				// their src to be replaced with an .mp3 URL and breaking video rendering.
+				item.type === "audio" &&
 				item.details?.audioEffects,
 		)
 		.map(async (item) => {

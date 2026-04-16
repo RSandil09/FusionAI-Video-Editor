@@ -35,6 +35,10 @@ export const groupTrackItems = (data: {
 
 			processed.add(currentId);
 			const currentItem = trackItemsMap[currentId];
+			// Skip orphaned IDs that exist in trackItemIds but not in trackItemsMap.
+			// This can happen after a failed save/restore or state corruption. Pushing
+			// undefined here would crash group[0].id in composition.tsx / VideoComposition.tsx.
+			if (!currentItem) break;
 			group.push(currentItem);
 
 			// Find transition from this item
