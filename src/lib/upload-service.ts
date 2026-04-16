@@ -23,7 +23,12 @@ export interface UploadProgress {
 }
 
 /**
- * Upload a file to the server
+ * Upload a file to R2 via presigned URL (bypasses Vercel 4.5 MB body limit).
+ *
+ * Flow:
+ *  1. POST /api/uploads/presign  → get presignedUrl + key + publicUrl
+ *  2. PUT directly to R2         → browser uploads straight to R2
+ *  3. POST /api/uploads/complete → save metadata to DB
  *
  * @param file - File to upload
  * @param onProgress - Progress callback
@@ -39,9 +44,7 @@ export async function uploadFile(
 		`(${(file.size / 1024 / 1024).toFixed(2)} MB)`,
 	);
 
-	// Get fresh token (force refresh to ensure it's valid)
 	const token = await getIdToken();
-
 	if (!token) {
 		const msg = "Not authenticated. Please log in to upload files.";
 		logger.error("❌", msg);
@@ -50,52 +53,97 @@ export async function uploadFile(
 
 	logger.log("   ✅ Got auth token (length:", token.length, ")");
 
-	const formData = new FormData();
-	formData.append("file", file);
+	// Step 1: Get presigned URL
+	logger.log("   🔑 Requesting presigned URL...");
+	let presignedUrl: string;
+	let key: string;
+	let publicUrl: string;
 
 	try {
-		logger.log("   🚀 Sending upload request to /api/uploads");
-
-		const response = await axios.post("/api/uploads", formData, {
-			headers: {
-				Authorization: `Bearer ${token}`,
+		const presignRes = await axios.post(
+			"/api/uploads/presign",
+			{
+				fileName: file.name,
+				fileSize: file.size,
+				contentType: file.type,
 			},
-			onUploadProgress: (progressEvent) => {
-				if (onProgress && progressEvent.total) {
-					const loaded = progressEvent.loaded;
-					const total = progressEvent.total;
-					const percentage = Math.round((loaded / total) * 100);
-					onProgress({ loaded, total, percentage });
-				}
-			},
-		});
-
-		logger.log("   ✅ Upload successful!");
-		return response.data.upload;
+			{ headers: { Authorization: `Bearer ${token}` } },
+		);
+		presignedUrl = presignRes.data.presignedUrl;
+		key = presignRes.data.key;
+		publicUrl = presignRes.data.publicUrl;
 	} catch (error) {
-		logger.error("   ❌ Upload failed:");
-
 		if (axios.isAxiosError(error)) {
-			logger.error("      Status:", error.response?.status);
-			logger.error(
-				"      Message:",
-				error.response?.data?.message || error.message,
-			);
-			logger.error("      Error:", error.response?.data?.error);
-
-			if (error.response?.status === 401) {
-				throw new Error(
-					error.response?.data?.message ||
-						"Authentication failed. Please refresh the page and try again.",
-				);
-			}
-
-			throw new Error(
-				error.response?.data?.message || error.message || "Upload failed",
-			);
+			const status = error.response?.status;
+			const message = error.response?.data?.message || error.message;
+			if (status === 401) throw new Error("Authentication failed. Please refresh the page and try again.");
+			if (status === 413) throw new Error("File too large. Maximum upload size is 500 MB.");
+			if (status === 415) throw new Error("Unsupported file type. Only video, image, and audio files are allowed.");
+			throw new Error(message || "Failed to get upload URL");
 		}
-
 		throw error;
+	}
+
+	// Step 2: PUT directly to R2 (no Vercel in the path)
+	logger.log("   🚀 Uploading directly to R2...");
+	await new Promise<void>((resolve, reject) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open("PUT", presignedUrl);
+		xhr.setRequestHeader("Content-Type", file.type);
+
+		xhr.upload.onprogress = (e) => {
+			if (onProgress && e.lengthComputable) {
+				const loaded = e.loaded;
+				const total = e.total;
+				const percentage = Math.round((loaded / total) * 100);
+				onProgress({ loaded, total, percentage });
+			}
+		};
+
+		xhr.onload = () => {
+			if (xhr.status >= 200 && xhr.status < 300) {
+				resolve();
+			} else {
+				reject(new Error(`R2 upload failed with status ${xhr.status}`));
+			}
+		};
+
+		xhr.onerror = () => reject(new Error("Network error during upload"));
+		xhr.onabort = () => reject(new Error("Upload aborted"));
+
+		xhr.send(file);
+	});
+
+	logger.log("   ✅ File uploaded to R2!");
+
+	// Step 3: Save metadata to DB
+	logger.log("   💾 Recording upload metadata...");
+	try {
+		const completeRes = await axios.post(
+			"/api/uploads/complete",
+			{
+				key,
+				fileName: file.name,
+				fileSize: file.size,
+				contentType: file.type,
+			},
+			{ headers: { Authorization: `Bearer ${token}` } },
+		);
+
+		logger.log("   ✅ Upload complete!");
+		return completeRes.data.upload;
+	} catch (error) {
+		// Metadata save failed but the file is already in R2.
+		// Return a best-effort result so the user's session isn't broken.
+		logger.error("   ⚠️ Metadata save failed (file is in R2):", error);
+		return {
+			id: key,
+			url: publicUrl,
+			fileName: file.name,
+			fileSize: file.size,
+			contentType: file.type,
+			uploadedAt: new Date().toISOString(),
+		};
 	}
 }
 
