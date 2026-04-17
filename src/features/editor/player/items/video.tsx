@@ -4,7 +4,7 @@ import { BoxAnim, ContentAnim, MaskAnim } from "@designcombo/animations";
 import { calculateContainerStyles, calculateMediaStyles } from "../styles";
 import { getAnimations } from "../../utils/get-animations";
 import { calculateFrames } from "../../utils/frames";
-import { Video as RemotionVideo, getRemotionEnvironment } from "remotion";
+import { Video as RemotionVideo, OffthreadVideo, getRemotionEnvironment } from "remotion";
 
 // Ensure video uses proxy URL for browser playback.
 // During Lambda/server rendering, Puppeteer cannot reach the Next.js proxy route,
@@ -92,16 +92,28 @@ export const Video = ({
 					frame={frame || 0}
 				>
 					<div style={calculateMediaStyles(details, crop)}>
-						<RemotionVideo
-							startFrom={((item.trim?.from ?? 0) / 1000) * fps}
-							endAt={endAtFrames}
-							playbackRate={playbackRate}
-							src={videoSrc}
-							volume={muteAudio ? 0 : (details.volume || 0) / 100}
-							onError={(e) => {
-								console.error("Video playback error:", e, "URL:", videoSrc);
-							}}
-						/>
+						{getRemotionEnvironment().isRendering ? (
+							// OffthreadVideo uses ffmpeg for frame-accurate extraction in Lambda.
+							// It handles large video files without relying on browser video APIs.
+							<OffthreadVideo
+								startFrom={((item.trim?.from ?? 0) / 1000) * fps}
+								endAt={endAtFrames}
+								playbackRate={playbackRate}
+								src={videoSrc}
+								volume={muteAudio ? 0 : (details.volume || 0) / 100}
+							/>
+						) : (
+							<RemotionVideo
+								startFrom={((item.trim?.from ?? 0) / 1000) * fps}
+								endAt={endAtFrames}
+								playbackRate={playbackRate}
+								src={videoSrc}
+								volume={muteAudio ? 0 : (details.volume || 0) / 100}
+								onError={(e) => {
+									console.error("Video playback error:", e, "URL:", videoSrc);
+								}}
+							/>
+						)}
 					</div>
 				</MaskAnim>
 			</ContentAnim>
