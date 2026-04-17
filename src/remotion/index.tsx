@@ -12,16 +12,31 @@ export const RemotionRoot: React.FC = () => {
 			<Composition
 				id="VideoEditor"
 				component={VideoComposition as React.ComponentType<any>}
-				durationInFrames={300} // Default 10 seconds at 30fps
+				durationInFrames={300} // fallback only — overridden by calculateMetadata
 				fps={30}
-				width={1080} // Portrait mode (mobile-first)
-				height={1920} // 9:16 aspect ratio
+				width={1080}
+				height={1920}
 				defaultProps={{
 					trackItemsMap: {},
 					trackItemIds: [],
 					transitionsMap: {},
 					fps: 30,
-					size: { width: 1080, height: 1920 }, // Match composition size
+					size: { width: 1080, height: 1920 },
+					durationInFrames: 300,
+				}}
+				calculateMetadata={({ props }) => {
+					// Read values injected via inputProps by the render API route.
+					// This is the correct Remotion v4 pattern for dynamic composition
+					// metadata — renderMediaOnLambda does not accept these directly.
+					const fps = (props as any).fps ?? 30;
+					const duration = (props as any).durationInFrames ?? 300;
+					const size = (props as any).size ?? { width: 1080, height: 1920 };
+					return {
+						durationInFrames: Math.max(1, Math.round(duration)),
+						fps,
+						width: size.width ?? 1080,
+						height: size.height ?? 1920,
+					};
 				}}
 			/>
 		</>

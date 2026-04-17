@@ -97,12 +97,9 @@ export async function startLambdaRender(
 		composition: config.compositionId,
 		inputProps: config.inputProps,
 		codec,
-		// Override composition defaults — without these Remotion falls back to the
-		// hardcoded values in remotion/index.tsx (300 frames = 10 s, 1080×1920).
-		durationInFrames: config.durationInFrames,
-		fps: config.fps,
-		width: config.width,
-		height: config.height,
+		// durationInFrames, fps, width, height are passed via inputProps and
+		// consumed by calculateMetadata in src/remotion/index.tsx, which is the
+		// correct Remotion v4 pattern for dynamic composition metadata.
 		...(isGif ? {} : {
 			crf: codec === "h265" ? 20 : 16,
 			pixelFormat: "yuv420p",

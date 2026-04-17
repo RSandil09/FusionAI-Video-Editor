@@ -125,6 +125,9 @@ export async function POST(request: Request) {
 					transitionsMap,
 					fps,
 					size: { width, height },
+					// Passed to calculateMetadata in src/remotion/index.tsx so the
+					// composition duration matches the actual timeline length.
+					durationInFrames,
 				},
 				fps,
 				width,
