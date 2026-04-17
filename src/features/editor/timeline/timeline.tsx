@@ -18,7 +18,9 @@ import {
 import { useTimelineOffsetX } from "../hooks/use-timeline-offset";
 import TrackLabels from "./track-labels";
 import { CanvasEngine } from "./engine/canvas-engine";
-import { buildEngineCallbacks } from "../hooks/use-engine-sync";
+import { buildEngineCallbacks, applyTransition } from "../hooks/use-engine-sync";
+import { TransitionPicker } from "./transition-picker";
+import type { TransitionDef } from "../data/transitions";
 
 // ── Constants — must match canvas-engine.ts ───────────────────────────────────
 const SIZES_MAP: Record<string, number> = {
@@ -48,6 +50,14 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 	const [scrollTop, setScrollTop] = useState(0);
 	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 	const [scrollSize, setScrollSize] = useState({ width: 0, height: 0 });
+
+	// Transition picker state
+	const [pickerState, setPickerState] = useState<{
+		fromId: string;
+		toId: string;
+		x: number;
+		y: number;
+	} | null>(null);
 
 	const {
 		scale,
@@ -118,6 +128,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 			fps,
 			playerRef,
 			engineRef,
+			(fromId, toId, x, y) => setPickerState({ fromId, toId, x, y }),
 		);
 
 		const eng = new CanvasEngine(canvasEl, {
@@ -311,6 +322,20 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 			id="timeline-container"
 			className="bg-background relative h-full w-full overflow-hidden flex flex-col"
 		>
+			{/* Transition picker portal */}
+			{pickerState && (
+				<TransitionPicker
+					fromId={pickerState.fromId}
+					toId={pickerState.toId}
+					anchorX={pickerState.x}
+					anchorY={pickerState.y}
+					onSelect={(transition: TransitionDef) => {
+						applyTransition(stateManager, pickerState.fromId, pickerState.toId, transition);
+						setPickerState(null);
+					}}
+					onClose={() => setPickerState(null)}
+				/>
+			)}
 			{/* Header */}
 			<Header stateManager={stateManager} />
 

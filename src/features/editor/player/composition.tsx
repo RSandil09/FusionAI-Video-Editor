@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { dispatch, filter, subject } from "@designcombo/events";
 import { EDIT_OBJECT, ENTER_EDIT_MODE } from "@designcombo/state";
 import { groupTrackItems } from "../utils/track-items";
-import { TransitionSeries, Transitions } from "@designcombo/transitions";
+import { TransitionSeries } from "@designcombo/transitions";
+import { Transitions } from "./transition-presentations";
 import { calculateTextHeight } from "../utils/text";
 import { useCurrentFrame } from "remotion";
 import useStore from "../store/use-store";
@@ -294,6 +295,7 @@ const Composition = () => {
 									...size,
 									id: item.id,
 									direction: item.direction,
+									color: (item as any).color,
 								});
 							}
 							const trackItem = trackItemsMap[item.id];

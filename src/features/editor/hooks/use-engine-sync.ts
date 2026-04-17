@@ -5,7 +5,70 @@ import {
 	ACTIVE_SPLIT,
 } from "@designcombo/state";
 import type { IDisplay, ITrim } from "@designcombo/types";
+import { generateId } from "@designcombo/timeline";
 import useStore from "../store/use-store";
+import type { TransitionDef } from "../data/transitions";
+
+/**
+ * Apply (or replace) a transition between two adjacent clips.
+ *
+ * Writes directly into StateManager via updateState() — the same proven
+ * pattern used by onItemMove / onItemResize.  `ADD_TRANSITION` dispatch is
+ * intentionally avoided: it has no verified handler in @designcombo/state.
+ */
+export function applyTransition(
+	stateManager: any,
+	fromId: string,
+	toId: string,
+	transitionDef: TransitionDef,
+) {
+	const current = stateManager.getState();
+	const existingTransitionsMap: Record<string, any> = current.transitionsMap ?? {};
+	const existingTransitionIds: string[] = current.transitionIds ?? [];
+
+	// Remove any existing transition between these two clips so there's only one.
+	const filteredEntries = Object.entries(existingTransitionsMap).filter(
+		([, t]: [string, any]) => !(t.fromId === fromId && t.toId === toId),
+	);
+	const filteredIds = existingTransitionIds.filter(
+		(id) => existingTransitionsMap[id]?.fromId !== fromId ||
+			existingTransitionsMap[id]?.toId !== toId,
+	);
+
+	if (transitionDef.kind === "none") {
+		// "None" just removes the existing transition
+		stateManager.updateState(
+			{
+				transitionsMap: Object.fromEntries(filteredEntries),
+				transitionIds: filteredIds,
+			},
+			{ updateHistory: true, kind: "update" },
+		);
+		return;
+	}
+
+	const id = generateId();
+	const newTransition = {
+		id,
+		fromId,
+		toId,
+		kind: transitionDef.kind,
+		duration: Math.round(transitionDef.duration * 1000), // ms
+		...(transitionDef.direction ? { direction: transitionDef.direction } : {}),
+		...(transitionDef.color ? { color: transitionDef.color } : {}),
+	};
+
+	stateManager.updateState(
+		{
+			transitionsMap: {
+				...Object.fromEntries(filteredEntries),
+				[id]: newTransition,
+			},
+			transitionIds: [...filteredIds, id],
+		},
+		{ updateHistory: true, kind: "update" },
+	);
+}
 
 /**
  * Build CanvasEngine option callbacks that dispatch back into @designcombo/state.
@@ -27,6 +90,7 @@ export function buildEngineCallbacks(
 	fps: number,
 	playerRef: React.RefObject<any> | null,
 	engineRef: React.RefObject<any>,
+	onTransitionZoneClick?: (fromId: string, toId: string, x: number, y: number) => void,
 ) {
 	return {
 		onScroll: (_v: { scrollTop: number; scrollLeft: number }) => {
@@ -175,5 +239,6 @@ export function buildEngineCallbacks(
 				playerRef.current.seekTo(Math.round((timeMs / 1000) * fps));
 			}
 		},
+		...(onTransitionZoneClick ? { onTransitionZoneClick } : {}),
 	};
 }

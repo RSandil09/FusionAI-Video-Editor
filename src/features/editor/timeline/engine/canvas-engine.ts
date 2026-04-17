@@ -156,6 +156,12 @@ export class CanvasEngine {
 		canvas.addEventListener("dblclick", this.onDblClick);
 		canvas.addEventListener("contextmenu", this.onContextMenu);
 
+		// Native HTML5 drag-and-drop — allows transitions to be dragged from the
+		// sidebar panel and dropped onto a transition zone between two clips.
+		canvas.addEventListener("dragover", this.onDragOver);
+		canvas.addEventListener("drop", this.onDrop);
+		canvas.addEventListener("dragleave", this.onDragLeave);
+
 		this.loop();
 	}
 
@@ -383,6 +389,9 @@ export class CanvasEngine {
 		this.canvas.removeEventListener("wheel", this.onWheel);
 		this.canvas.removeEventListener("dblclick", this.onDblClick);
 		this.canvas.removeEventListener("contextmenu", this.onContextMenu);
+		this.canvas.removeEventListener("dragover", this.onDragOver);
+		this.canvas.removeEventListener("drop", this.onDrop);
+		this.canvas.removeEventListener("dragleave", this.onDragLeave);
 		this.items = [];
 		this.trackRows = [];
 	}
@@ -618,12 +627,16 @@ export class CanvasEngine {
 				// Adjacent items — draw transition zone
 				const gap = b.left - (a.left + a.width);
 				if (Math.abs(gap) < 4) {
+					const isDndTarget =
+						this.dndHoverZone?.fromId === a.id &&
+						this.dndHoverZone?.toId === b.id;
 					this.renderTransitionZone(
 						ctx,
 						a.left + a.width - TRANSITION_W / 2,
 						row.top,
 						TRANSITION_W,
 						row.height,
+						isDndTarget,
 					);
 				}
 			}
@@ -659,18 +672,20 @@ export class CanvasEngine {
 		y: number,
 		w: number,
 		h: number,
+		highlighted = false,
 	) {
 		ctx.save();
+		const alpha = highlighted ? 0.6 : 0.35;
 		const grad = ctx.createLinearGradient(x, y, x + w, y);
 		grad.addColorStop(0, "rgba(99,102,241,0)");
-		grad.addColorStop(0.5, "rgba(99,102,241,0.35)");
+		grad.addColorStop(0.5, `rgba(99,102,241,${alpha})`);
 		grad.addColorStop(1, "rgba(99,102,241,0)");
 		ctx.fillStyle = grad;
 		ctx.fillRect(x, y, w, h);
 
 		// Diagonal lines
-		ctx.strokeStyle = "rgba(99,102,241,0.5)";
-		ctx.lineWidth = 1;
+		ctx.strokeStyle = highlighted ? "rgba(99,102,241,0.9)" : "rgba(99,102,241,0.5)";
+		ctx.lineWidth = highlighted ? 2 : 1;
 		const step = 6;
 		ctx.beginPath();
 		for (let lx = x; lx <= x + w + h; lx += step) {
@@ -678,6 +693,13 @@ export class CanvasEngine {
 			ctx.lineTo(lx - h, y + h);
 		}
 		ctx.stroke();
+
+		// Highlight border
+		if (highlighted) {
+			ctx.strokeStyle = "rgba(99,102,241,1)";
+			ctx.lineWidth = 2;
+			ctx.strokeRect(x, y, w, h);
+		}
 		ctx.restore();
 	}
 
@@ -871,6 +893,35 @@ export class CanvasEngine {
 		);
 	}
 
+	/**
+	 * Returns the fromId/toId pair if (cx, cy) lands inside a transition zone
+	 * between two adjacent clips on the same track row.  Returns null otherwise.
+	 */
+	private getTransitionZoneAt(
+		cx: number,
+		cy: number,
+	): { fromId: string; toId: string } | null {
+		for (const row of this.trackRows) {
+			if (cy < row.top || cy >= row.top + row.height) continue;
+			const rowItems = this.items
+				.filter((it) => row.itemIds.includes(it.id))
+				.sort((a, b) => a.left - b.left);
+
+			for (let i = 0; i < rowItems.length - 1; i++) {
+				const a = rowItems[i];
+				const b = rowItems[i + 1];
+				const gap = b.left - (a.left + a.width);
+				if (Math.abs(gap) >= 4) continue; // not adjacent
+				const zoneLeft = a.left + a.width - TRANSITION_W / 2;
+				const zoneRight = zoneLeft + TRANSITION_W;
+				if (cx >= zoneLeft && cx <= zoneRight) {
+					return { fromId: a.id, toId: b.id };
+				}
+			}
+		}
+		return null;
+	}
+
 	// ── Pointer events ────────────────────────────────────────────────────────────
 
 	private onMouseDown = (e: MouseEvent) => {
@@ -920,6 +971,20 @@ export class CanvasEngine {
 			};
 			this.canvas.style.cursor = "grabbing";
 			return;
+		}
+
+		// — transition zone click —
+		if (this.opts.onTransitionZoneClick) {
+			const zone = this.getTransitionZoneAt(cx, cy);
+			if (zone) {
+				this.opts.onTransitionZoneClick(
+					zone.fromId,
+					zone.toId,
+					e.clientX,
+					e.clientY,
+				);
+				return;
+			}
 		}
 
 		// — select mode —
@@ -1014,6 +1079,8 @@ export class CanvasEngine {
 			const handle = this.getHandleAt(cx, cy);
 			if (handle && handle.item.isSelected) {
 				this.canvas.style.cursor = "ew-resize";
+			} else if (this.getTransitionZoneAt(cx, cy)) {
+				this.canvas.style.cursor = "pointer";
 			} else if (this.getItemAt(cx, cy)) {
 				this.canvas.style.cursor = "grab";
 			} else {
@@ -1309,6 +1376,62 @@ export class CanvasEngine {
 		};
 		this.addMarker(marker);
 		this.opts.onMarkerAdd(marker);
+	};
+
+	// ── HTML5 DnD — transition drag-and-drop from sidebar panel ──────────────────
+
+	/** The zone currently under an active DnD drag — highlighted with a border. */
+	private dndHoverZone: { fromId: string; toId: string } | null = null;
+
+	private onDragOver = (e: DragEvent) => {
+		// Only accept dragged transitions (type starts with '{"' for our JSON-key trick)
+		const type = e.dataTransfer?.types?.[0] ?? "";
+		try {
+			const data = JSON.parse(type);
+			if (data?.type !== "transition") return;
+		} catch {
+			return;
+		}
+		e.preventDefault();
+		e.dataTransfer!.dropEffect = "copy";
+
+		const [cx, cy] = this.screenToCanvas(e.clientX, e.clientY);
+		const zone = this.getTransitionZoneAt(cx, cy);
+		if (zone?.fromId !== this.dndHoverZone?.fromId || zone?.toId !== this.dndHoverZone?.toId) {
+			this.dndHoverZone = zone;
+			this.requestRenderAll();
+		}
+		this.canvas.style.cursor = zone ? "copy" : "no-drop";
+	};
+
+	private onDrop = (e: DragEvent) => {
+		e.preventDefault();
+		this.dndHoverZone = null;
+		this.canvas.style.cursor = "default";
+		this.requestRenderAll();
+
+		if (!this.opts.onTransitionZoneClick) return;
+		try {
+			const type = e.dataTransfer?.types?.[0] ?? "";
+			const data = JSON.parse(type);
+			if (data?.type !== "transition") return;
+		} catch {
+			return;
+		}
+
+		const [cx, cy] = this.screenToCanvas(e.clientX, e.clientY);
+		const zone = this.getTransitionZoneAt(cx, cy);
+		if (zone) {
+			this.opts.onTransitionZoneClick(zone.fromId, zone.toId, e.clientX, e.clientY);
+		}
+	};
+
+	private onDragLeave = (_e: DragEvent) => {
+		if (this.dndHoverZone) {
+			this.dndHoverZone = null;
+			this.canvas.style.cursor = "default";
+			this.requestRenderAll();
+		}
 	};
 
 	// ── Selection ─────────────────────────────────────────────────────────────────
