@@ -92,7 +92,7 @@ function RingProgress({ progress }: { progress: number }) {
 const DownloadProgressModal = () => {
 	const { progress, displayProgressModal, output, error, actions, projectId, exportType } =
 		useDownloadState();
-	const { duration, size, fps } = useStore();
+	const { duration, size } = useStore();
 
 	const isCompleted = !!output?.url;
 	const hasFailed = !!error;
@@ -157,11 +157,15 @@ const DownloadProgressModal = () => {
 		}
 	}, [isCompleted, output]);
 
-	const handleDownload = async () => {
-		if (output?.url) {
-			const ext = output.type === "webm" ? "webm" : output.type === "gif" ? "gif" : "mp4";
-			await download(output.url, `export.${ext}`);
-		}
+	const [isDownloading, setIsDownloading] = useState(false);
+
+	const handleDownload = () => {
+		if (!output?.url || isDownloading) return;
+		setIsDownloading(true);
+		const ext = output.type === "webm" ? "webm" : output.type === "gif" ? "gif" : "mp4";
+		download(output.url, `export.${ext}`);
+		// Give the browser ~1.5 s to show its download bar, then reset the button.
+		setTimeout(() => setIsDownloading(false), 1500);
 	};
 
 	const handleClose = () => {
@@ -289,10 +293,20 @@ const DownloadProgressModal = () => {
 							<div className="flex flex-col gap-2.5 w-full max-w-xs">
 								<Button
 									onClick={handleDownload}
+									disabled={isDownloading}
 									className="w-full gap-2 h-10 rounded-xl font-medium"
 								>
-									<Download className="h-4 w-4" />
-									Download {formatLabel.split(" · ")[0]}
+									{isDownloading ? (
+										<>
+											<Loader2 className="h-4 w-4 animate-spin" />
+											Preparing download…
+										</>
+									) : (
+										<>
+											<Download className="h-4 w-4" />
+											Download {formatLabel.split(" · ")[0]}
+										</>
+									)}
 								</Button>
 
 								{output?.url && (
