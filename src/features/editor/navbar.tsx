@@ -19,6 +19,7 @@ import {
 	CheckCircle2,
 	AlertCircle,
 	ExternalLink,
+	Check,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { getIdToken } from "@/lib/auth/client";
@@ -368,41 +369,48 @@ const PublishPopover = () => {
 
 const EXPORT_FORMATS: {
 	id: ExportFormat;
-	label: string;
+	codec: string;
+	container: string;
 	description: string;
 	badge?: string;
 	badgeColor?: string;
 }[] = [
 	{
 		id: "mp4",
-		label: "MP4 — H.264",
-		description: "Works everywhere, social media ready",
+		codec: "H.264",
+		container: "MP4",
+		description: "Universal · social ready",
 		badge: "Recommended",
 		badgeColor: "bg-primary/15 text-primary",
 	},
 	{
 		id: "mp4-hevc",
-		label: "MP4 — H.265",
-		description: "Same quality, ~50% smaller file",
+		codec: "H.265",
+		container: "MP4",
+		description: "~50% smaller file size",
 		badge: "Best quality",
-		badgeColor: "bg-green-500/15 text-green-500",
+		badgeColor: "bg-green-500/15 text-green-600",
 	},
 	{
 		id: "webm",
-		label: "WebM — VP9",
-		description: "Optimised for web embedding",
+		codec: "VP9",
+		container: "WebM",
+		description: "Optimised for web",
 	},
 	{
 		id: "gif",
-		label: "GIF",
-		description: "Short clips only, no audio",
-	},
-	{
-		id: "json",
-		label: "JSON",
-		description: "Export raw project data",
+		codec: "GIF",
+		container: "",
+		description: "No audio · short clips",
 	},
 ];
+
+function formatDuration(ms: number): string {
+	const totalSecs = Math.floor(ms / 1000);
+	const mins = Math.floor(totalSecs / 60);
+	const secs = totalSecs % 60;
+	return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
 
 const DownloadPopover = ({
 	stateManager,
@@ -410,18 +418,10 @@ const DownloadPopover = ({
 }: { stateManager: StateManager; projectId?: string }) => {
 	const isMediumScreen = useIsMediumScreen();
 	const { actions, exportType } = useDownloadState();
-	const { duration, tracks } = useStore();
-	const [isExportTypeOpen, setIsExportTypeOpen] = useState(false);
+	const { duration, tracks, size, fps } = useStore();
 	const [open, setOpen] = useState(false);
 
-	const selectedFormat = EXPORT_FORMATS.find((f) => f.id === exportType) ?? EXPORT_FORMATS[0];
-
 	const handleExport = () => {
-		// Recompute trackItemIds from the live Zustand tracks array so the
-		// exported render order always matches the current timeline visual order.
-		// This corrects stale trackItemIds in projects saved before the drag-fix
-		// AND ensures the Lambda composition renders the same z-order as the preview.
-		// tracks[0] = top track = renders last (highest z-index) → reverse then flatten.
 		const trackItemIds = [...tracks]
 			.reverse()
 			.flatMap((t: any) => (t.items ?? t.trackItemIds ?? []) as string[]);
@@ -429,9 +429,7 @@ const DownloadPopover = ({
 		const data: IDesign = {
 			id: generateId(),
 			...stateManager.toJSON(),
-			// Explicitly include duration from Zustand store — toJSON() may omit it
 			duration,
-			// Override with freshly recomputed order — never trust persisted trackItemIds
 			trackItemIds,
 		};
 		if (projectId) {
@@ -444,66 +442,108 @@ const DownloadPopover = ({
 		setOpen(false);
 	};
 
+	const selectedFormat = EXPORT_FORMATS.find((f) => f.id === exportType) ?? EXPORT_FORMATS[0];
+	const exportLabel = selectedFormat.container
+		? `${selectedFormat.container} · ${selectedFormat.codec}`
+		: selectedFormat.codec;
+
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
 				<Button
-					className="flex h-7 gap-1 border border-border"
+					className="flex h-7 gap-1.5 border border-border rounded-xl"
 					size={isMediumScreen ? "sm" : "icon"}
 				>
-					<Download width={18} />
-					<span className="hidden md:block">Export</span>
+					<Download width={15} />
+					<span className="hidden md:block text-xs">Export</span>
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent
 				align="end"
-				className="bg-sidebar z-[250] flex w-72 flex-col gap-4 rounded-2xl border-border/60 p-4"
+				className="bg-sidebar z-[250] w-80 p-0 rounded-2xl border-border/60 overflow-hidden shadow-xl"
 			>
-				<Label className="text-sm font-semibold">Export settings</Label>
+				{/* Header */}
+				<div className="flex items-center justify-between px-4 py-3.5 border-b border-border/50">
+					<div className="flex items-center gap-2.5">
+						<div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-none">
+							<Download className="w-3.5 h-3.5 text-primary" />
+						</div>
+						<span className="text-sm font-semibold">Export Video</span>
+					</div>
+					<div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+						<span>{formatDuration(duration)}</span>
+						<span className="opacity-40">·</span>
+						<span>{size.width}×{size.height}</span>
+						<span className="opacity-40">·</span>
+						<span>{fps}fps</span>
+					</div>
+				</div>
 
-				{/* Format selector */}
-				<Popover open={isExportTypeOpen} onOpenChange={setIsExportTypeOpen}>
-					<PopoverTrigger asChild>
-						<Button
-							className="w-full justify-between rounded-xl h-auto py-2.5 px-3"
-							variant="outline"
-						>
-							<div className="text-left">
-								<div className="text-sm font-medium">{selectedFormat.label}</div>
-								<div className="text-xs text-muted-foreground">{selectedFormat.description}</div>
-							</div>
-							<ChevronDown width={14} className="shrink-0 ml-2 text-muted-foreground" />
-						</Button>
-					</PopoverTrigger>
-					<PopoverContent className="bg-background z-[251] w-[--radix-popover-trigger-width] px-2 py-2 rounded-xl">
-						{EXPORT_FORMATS.map((fmt) => (
-							<div
+				{/* Format grid */}
+				<div className="p-3 grid grid-cols-2 gap-1.5">
+					{EXPORT_FORMATS.map((fmt) => {
+						const selected = exportType === fmt.id;
+						return (
+							<button
 								key={fmt.id}
-								className={`flex items-center justify-between rounded-lg px-3 py-2 hover:cursor-pointer hover:bg-muted/60 transition-colors ${
-									exportType === fmt.id ? "bg-muted/40" : ""
+								onClick={() => actions.setExportType(fmt.id)}
+								className={`relative flex flex-col items-start gap-0.5 rounded-xl px-3 py-2.5 text-left transition-all border ${
+									selected
+										? "border-primary/60 bg-primary/5 text-foreground"
+										: "border-border/50 bg-transparent hover:bg-muted/50 text-foreground"
 								}`}
-								onClick={() => {
-									actions.setExportType(fmt.id);
-									setIsExportTypeOpen(false);
-								}}
 							>
-								<div>
-									<div className="text-sm font-medium">{fmt.label}</div>
-									<div className="text-xs text-muted-foreground">{fmt.description}</div>
+								<div className="flex items-center justify-between w-full gap-1">
+									<span className="text-xs font-semibold leading-tight">
+										{fmt.container ? `${fmt.codec}` : fmt.codec}
+									</span>
+									{selected && (
+										<Check className="w-3 h-3 text-primary flex-none" />
+									)}
 								</div>
+								{fmt.container && (
+									<span className="text-[10px] text-muted-foreground leading-tight">
+										{fmt.container}
+									</span>
+								)}
+								<span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+									{fmt.description}
+								</span>
 								{fmt.badge && (
-									<span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ml-2 shrink-0 ${fmt.badgeColor}`}>
+									<span className={`mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${fmt.badgeColor}`}>
 										{fmt.badge}
 									</span>
 								)}
-							</div>
-						))}
-					</PopoverContent>
-				</Popover>
+							</button>
+						);
+					})}
+				</div>
 
-				<Button onClick={handleExport} className="w-full rounded-xl">
-					Export {selectedFormat.label.split("—")[0].trim()}
-				</Button>
+				{/* JSON export link */}
+				<div className="flex justify-center pb-1">
+					<button
+						onClick={() => actions.setExportType("json")}
+						className={`text-[11px] transition-colors px-2 py-1 rounded-lg ${
+							exportType === "json"
+								? "text-primary font-medium"
+								: "text-muted-foreground hover:text-foreground"
+						}`}
+					>
+						{exportType === "json" && <Check className="w-3 h-3 inline mr-1" />}
+						Export as JSON
+					</button>
+				</div>
+
+				{/* Export button */}
+				<div className="px-3 pb-3">
+					<Button
+						onClick={handleExport}
+						className="w-full rounded-xl h-9 text-sm font-medium gap-2"
+					>
+						<Download className="w-3.5 h-3.5" />
+						Export {exportLabel}
+					</Button>
+				</div>
 			</PopoverContent>
 		</Popover>
 	);
