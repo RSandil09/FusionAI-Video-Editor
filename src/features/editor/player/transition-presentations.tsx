@@ -24,6 +24,12 @@ import { blur } from "./presentations/blur";
 import { dipToColor } from "./presentations/dip-to-color";
 import { spin } from "./presentations/spin";
 import { zoomBlur } from "./presentations/zoom-blur";
+import { push } from "./presentations/push";
+import { glitch } from "./presentations/glitch";
+import { colorSplit } from "./presentations/color-split";
+import { dreamFade } from "./presentations/dream-fade";
+import { squeeze } from "./presentations/squeeze";
+import { crossZoom } from "./presentations/cross-zoom";
 
 import type { SlideDirection } from "@designcombo/transitions";
 
@@ -69,12 +75,26 @@ export const Transitions: Record<
 			timing={linearTiming({ durationInFrames })}
 		/>
 	),
+	dreamFade: ({ durationInFrames, id }: TransitionOptions) => (
+		<TransitionSeries.Transition
+			key={id}
+			presentation={dreamFade()}
+			timing={linearTiming({ durationInFrames })}
+		/>
+	),
 
 	// ── Slide ────────────────────────────────────────────────────────────────────
 	slide: ({ durationInFrames, id, direction }: TransitionOptions) => (
 		<TransitionSeries.Transition
 			key={id}
 			presentation={slide({ direction: direction as SlideDirection })}
+			timing={linearTiming({ durationInFrames })}
+		/>
+	),
+	push: ({ durationInFrames, id, direction }: TransitionOptions) => (
+		<TransitionSeries.Transition
+			key={id}
+			presentation={push({ direction: direction as any })}
 			timing={linearTiming({ durationInFrames })}
 		/>
 	),
@@ -126,6 +146,13 @@ export const Transitions: Record<
 			timing={linearTiming({ durationInFrames })}
 		/>
 	),
+	crossZoom: ({ durationInFrames, id }: TransitionOptions) => (
+		<TransitionSeries.Transition
+			key={id}
+			presentation={crossZoom()}
+			timing={linearTiming({ durationInFrames })}
+		/>
+	),
 	blur: ({ durationInFrames, id }: TransitionOptions) => (
 		<TransitionSeries.Transition
 			key={id}
@@ -140,6 +167,27 @@ export const Transitions: Record<
 			key={id}
 			presentation={spin()}
 			timing={linearTiming({ durationInFrames })}
+		/>
+	),
+	glitch: ({ durationInFrames, id }: TransitionOptions) => (
+		<TransitionSeries.Transition
+			key={id}
+			presentation={glitch()}
+			timing={linearTiming({ durationInFrames })}
+		/>
+	),
+	colorSplit: ({ durationInFrames, id }: TransitionOptions) => (
+		<TransitionSeries.Transition
+			key={id}
+			presentation={colorSplit()}
+			timing={linearTiming({ durationInFrames })}
+		/>
+	),
+	squeeze: ({ durationInFrames, id, direction }: TransitionOptions) => (
+		<TransitionSeries.Transition
+			key={id}
+			presentation={squeeze({ axis: direction === "horizontal" ? "horizontal" : "vertical" })}
+			timing={springTiming({ durationInFrames, config: { damping: 200 } })}
 		/>
 	),
 	star: ({ width, height, durationInFrames, id }: TransitionOptions) => (

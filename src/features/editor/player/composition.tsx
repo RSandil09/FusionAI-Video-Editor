@@ -251,15 +251,18 @@ const Composition = () => {
 			{groupedItems.map((group, index) => {
 				if (group.length === 1) {
 					const item = trackItemsMap[group[0].id];
+					if (!item) return null; // orphaned id — item was deleted
 					// Solo: completely remove from composition (no visual, no audio)
 					if (hiddenItemIds.has(item.id)) return null;
 					const muteAudio = audioMutedItemIds.has(item.id);
 					// Mute on audio-only track: nothing to show, skip entirely
 					if (muteAudio && AUDIO_ONLY_TYPES.has(item.type)) return null;
+					// Guard: unknown item type — log and skip to avoid a crash
+					if (!SequenceItem[item.type]) {
+						console.warn(`[Composition] Unknown item type "${item.type}" (id: ${item.id}) — skipping`);
+						return null;
+					}
 					// Display-window guard: skip items whose time window doesn't cover the current frame.
-					// This is the primary visibility gate — Remotion's <Sequence> provides a second
-					// layer inside BaseSequence, but explicit gating here is more reliable and
-					// ensures no item leaks outside its display.from / display.to range.
 					const itemFromFrame = Math.round(
 						((item.display?.from ?? 0) / 1000) * fps,
 					);
@@ -279,6 +282,11 @@ const Composition = () => {
 					});
 				}
 				const firstItem = trackItemsMap[group[0].id];
+				// Guard: first item in group missing from map (state corruption)
+				if (!firstItem) {
+					console.warn(`[Composition] TransitionSeries group[0] id "${group[0].id}" not in trackItemsMap — skipping group`);
+					return null;
+				}
 				// Solo: skip the whole transition group if first item is hidden
 				if (hiddenItemIds.has(firstItem.id)) return null;
 				const from = Math.round(((firstItem.display?.from ?? 0) / 1000) * fps);
@@ -290,6 +298,11 @@ const Composition = () => {
 									1,
 									Math.round((item.duration / 1000) * fps),
 								);
+								// Guard: unknown transition kind — log and fall back to a 1-frame fade
+								if (!Transitions[item.kind]) {
+									console.warn(`[Composition] Unknown transition kind "${item.kind}" (id: ${item.id}) — falling back to fade`);
+									return Transitions["fade"]({ durationInFrames, ...size, id: item.id });
+								}
 								return Transitions[item.kind]({
 									durationInFrames,
 									...size,
@@ -299,9 +312,15 @@ const Composition = () => {
 								});
 							}
 							const trackItem = trackItemsMap[item.id];
+							if (!trackItem) return null; // orphaned id in transition group
 							if (hiddenItemIds.has(item.id)) return null;
 							const muteAudio = audioMutedItemIds.has(item.id);
-							return SequenceItem[item.type](trackItem, {
+							// Guard: unknown item type inside a transition group
+							if (!SequenceItem[trackItem.type]) {
+								console.warn(`[Composition] Unknown item type "${trackItem.type}" in transition group (id: ${item.id}) — skipping`);
+								return null;
+							}
+							return SequenceItem[trackItem.type](trackItem, {
 								fps,
 								handleTextChange,
 								onTextBlur,

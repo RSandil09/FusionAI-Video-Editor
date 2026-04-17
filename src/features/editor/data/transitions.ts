@@ -57,8 +57,57 @@ export const TRANSITIONS: TransitionDef[] = [
 		previewColor: "linear-gradient(135deg, #e0e0e0 0%, #fff 50%, #e0e0e0 100%)",
 		category: "basic",
 	},
+	{
+		id: "dream-fade",
+		kind: "dreamFade",
+		name: "Dream",
+		duration: 0.7,
+		type: "transition",
+		previewColor: "linear-gradient(135deg, #fce4ec 0%, #fff9c4 50%, #e8f5e9 100%)",
+		category: "basic",
+	},
 
 	// ── Slide ────────────────────────────────────────────────────────────────────
+	{
+		id: "push-left",
+		kind: "push",
+		name: "Push Left",
+		duration: 0.5,
+		type: "transition",
+		direction: "left",
+		previewColor: "linear-gradient(90deg, #0ea5e9 0%, #6366f1 100%)",
+		category: "slide",
+	},
+	{
+		id: "push-right",
+		kind: "push",
+		name: "Push Right",
+		duration: 0.5,
+		type: "transition",
+		direction: "right",
+		previewColor: "linear-gradient(270deg, #0ea5e9 0%, #6366f1 100%)",
+		category: "slide",
+	},
+	{
+		id: "push-up",
+		kind: "push",
+		name: "Push Up",
+		duration: 0.5,
+		type: "transition",
+		direction: "up",
+		previewColor: "linear-gradient(180deg, #0ea5e9 0%, #6366f1 100%)",
+		category: "slide",
+	},
+	{
+		id: "push-down",
+		kind: "push",
+		name: "Push Down",
+		duration: 0.5,
+		type: "transition",
+		direction: "down",
+		previewColor: "linear-gradient(0deg, #0ea5e9 0%, #6366f1 100%)",
+		category: "slide",
+	},
 	{
 		id: "3",
 		kind: "slide",
@@ -244,6 +293,15 @@ export const TRANSITIONS: TransitionDef[] = [
 
 	// ── Zoom ─────────────────────────────────────────────────────────────────────
 	{
+		id: "cross-zoom",
+		kind: "crossZoom",
+		name: "Cross Zoom",
+		duration: 0.5,
+		type: "transition",
+		previewColor: "radial-gradient(circle at 30% 70%, #f59e0b 0%, #ef4444 60%, #8b5cf6 100%)",
+		category: "zoom",
+	},
+	{
 		id: "zoom-in",
 		kind: "zoomIn",
 		name: "Zoom In",
@@ -281,6 +339,33 @@ export const TRANSITIONS: TransitionDef[] = [
 	},
 
 	// ── Special ──────────────────────────────────────────────────────────────────
+	{
+		id: "glitch",
+		kind: "glitch",
+		name: "Glitch",
+		duration: 0.4,
+		type: "transition",
+		previewColor: "linear-gradient(135deg, #00ff87 0%, #60efff 25%, #ff0099 50%, #60efff 75%, #00ff87 100%)",
+		category: "special",
+	},
+	{
+		id: "color-split",
+		kind: "colorSplit",
+		name: "Color Split",
+		duration: 0.5,
+		type: "transition",
+		previewColor: "linear-gradient(90deg, #ff0000 0%, #00ff00 50%, #0000ff 100%)",
+		category: "special",
+	},
+	{
+		id: "squeeze-v",
+		kind: "squeeze",
+		name: "Squeeze",
+		duration: 0.5,
+		type: "transition",
+		previewColor: "linear-gradient(180deg, #1e293b 0%, #475569 50%, #1e293b 100%)",
+		category: "special",
+	},
 	{
 		id: "spin",
 		kind: "spin",

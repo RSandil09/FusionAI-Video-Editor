@@ -107,9 +107,8 @@ export interface EngineOptions {
 		toTrackId: string,
 	) => void;
 	/**
-	 * Called when the user clicks (or drops a transition onto) the zone between
-	 * two adjacent clips.  `x` and `y` are viewport coordinates of the click,
-	 * used to position an anchor popover.
+	 * Called when the user clicks the zone between two adjacent clips.
+	 * `x` and `y` are viewport coordinates used to position an anchor popover.
 	 */
 	onTransitionZoneClick?: (
 		fromId: string,
@@ -117,6 +116,12 @@ export interface EngineOptions {
 		x: number,
 		y: number,
 	) => void;
+	/**
+	 * Called when the user drags a transition from the panel and drops it onto
+	 * the zone between two adjacent clips.  `data` is the raw `TransitionDef`
+	 * object (not lowercased) recovered from the drag payload.
+	 */
+	onTransitionDrop?: (fromId: string, toId: string, data: unknown) => void;
 }
 
 // ─── Drag / resize state ──────────────────────────────────────────────────────

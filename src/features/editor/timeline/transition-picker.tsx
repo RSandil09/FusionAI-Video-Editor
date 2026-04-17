@@ -105,9 +105,7 @@ export const TransitionPicker: React.FC<TransitionPickerProps> = ({
 									<TransitionCard
 										key={t.id}
 										transition={t}
-										isActive={currentKind === t.kind && !t.direction
-											? currentKind === t.kind
-											: currentKind === t.kind}
+										isActive={currentKind === t.kind}
 										onSelect={onSelect}
 									/>
 								))}

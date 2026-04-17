@@ -9,6 +9,11 @@ import { generateId } from "@designcombo/timeline";
 import useStore from "../store/use-store";
 import type { TransitionDef } from "../data/transitions";
 
+// Pick only the fields we use so we accept both the full TransitionDef and the
+// lowercased-key variant that can come back from dataTransfer.
+type TransitionLike = Pick<TransitionDef, "kind" | "duration"> &
+	Partial<Pick<TransitionDef, "direction" | "color">>;
+
 /**
  * Apply (or replace) a transition between two adjacent clips.
  *
@@ -20,7 +25,25 @@ export function applyTransition(
 	stateManager: any,
 	fromId: string,
 	toId: string,
-	transitionDef: TransitionDef,
+	transitionDef: TransitionLike,
+) {
+	try {
+		_applyTransition(stateManager, fromId, toId, transitionDef);
+	} catch (err) {
+		console.error("[applyTransition] Failed to apply transition:", {
+			fromId,
+			toId,
+			kind: transitionDef?.kind,
+			error: err,
+		});
+	}
+}
+
+function _applyTransition(
+	stateManager: any,
+	fromId: string,
+	toId: string,
+	transitionDef: TransitionLike,
 ) {
 	const current = stateManager.getState();
 	const existingTransitionsMap: Record<string, any> = current.transitionsMap ?? {};
@@ -35,39 +58,63 @@ export function applyTransition(
 			existingTransitionsMap[id]?.toId !== toId,
 	);
 
+	const newTransitionsMap = Object.fromEntries(filteredEntries);
+	const newTransitionIds = [...filteredIds];
+
 	if (transitionDef.kind === "none") {
 		// "None" just removes the existing transition
 		stateManager.updateState(
-			{
-				transitionsMap: Object.fromEntries(filteredEntries),
-				transitionIds: filteredIds,
-			},
+			{ transitionsMap: newTransitionsMap, transitionIds: newTransitionIds },
 			{ updateHistory: true, kind: "update" },
 		);
+		// Belt-and-suspenders: push directly into Zustand so the composition
+		// re-renders even if subscribeToState misses a no-op diff.
+		useStore.getState().setState({
+			transitionsMap: newTransitionsMap,
+			transitionIds: newTransitionIds,
+		});
 		return;
 	}
+
+	// Find the track that owns fromId — required by ITransition.trackId.
+	const tracks: any[] = current.tracks ?? [];
+	const trackId =
+		tracks.find((t: any) => {
+			const items: string[] = (t.items ?? t.trackItemIds ?? []) as string[];
+			return items.includes(fromId);
+		})?.id ?? "";
 
 	const id = generateId();
 	const newTransition = {
 		id,
+		// ITransition requires type:"transition" — composition.tsx uses this
+		// to distinguish transitions from track items in a TransitionSeries group.
+		type: "transition",
+		trackId,
 		fromId,
 		toId,
 		kind: transitionDef.kind,
-		duration: Math.round(transitionDef.duration * 1000), // ms
+		duration: Math.round((transitionDef.duration ?? 0.5) * 1000), // ms
 		...(transitionDef.direction ? { direction: transitionDef.direction } : {}),
 		...(transitionDef.color ? { color: transitionDef.color } : {}),
 	};
 
+	const finalTransitionsMap = { ...newTransitionsMap, [id]: newTransition };
+	const finalTransitionIds = [...newTransitionIds, id];
+
 	stateManager.updateState(
 		{
-			transitionsMap: {
-				...Object.fromEntries(filteredEntries),
-				[id]: newTransition,
-			},
-			transitionIds: [...filteredIds, id],
+			transitionsMap: finalTransitionsMap,
+			transitionIds: finalTransitionIds,
 		},
 		{ updateHistory: true, kind: "update" },
 	);
+	// Belt-and-suspenders: push directly into Zustand so the composition
+	// re-renders immediately regardless of subscribeToState diff behaviour.
+	useStore.getState().setState({
+		transitionsMap: finalTransitionsMap,
+		transitionIds: finalTransitionIds,
+	});
 }
 
 /**
@@ -240,5 +287,8 @@ export function buildEngineCallbacks(
 			}
 		},
 		...(onTransitionZoneClick ? { onTransitionZoneClick } : {}),
+		onTransitionDrop: (fromId: string, toId: string, data: unknown) => {
+			applyTransition(stateManager, fromId, toId, data as TransitionLike);
+		},
 	};
 }

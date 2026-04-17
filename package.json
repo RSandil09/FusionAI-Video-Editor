@@ -12,7 +12,7 @@
 		"format:check": "biome format .",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"remotion:deploy": "npx remotion lambda sites create src/remotion/index.tsx --site-name=video-editor"
+		"remotion:deploy": "node scripts/remotion-deploy.mjs"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.986.0",

@@ -37,6 +37,9 @@ interface ITimelineStore {
 	sceneMoveableRef: React.RefObject<Moveable> | null;
 	setSceneMoveableRef: (ref: React.RefObject<Moveable>) => void;
 	setState: (state: any) => Promise<void>;
+	/** The global StateManager instance — set once on editor mount */
+	stateManager: any | null;
+	setStateManager: (sm: any) => void;
 	compositions: Partial<IComposition>[];
 	setCompositions: (compositions: Partial<IComposition>[]) => void;
 
@@ -64,6 +67,8 @@ interface ITimelineStore {
 }
 
 const useStore = create<ITimelineStore>((set) => ({
+	stateManager: null,
+	setStateManager: (sm) => set({ stateManager: sm }),
 	compositions: [],
 	structure: [],
 	setCompositions: (compositions) => set({ compositions }),

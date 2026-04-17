@@ -2,7 +2,12 @@ import { AbsoluteFill, useCurrentFrame } from "remotion";
 import React from "react";
 import { SequenceItem } from "../features/editor/player/sequence-item";
 import { groupTrackItems } from "../features/editor/utils/track-items";
-import { TransitionSeries, Transitions } from "@designcombo/transitions";
+import { TransitionSeries } from "@designcombo/transitions";
+// IMPORTANT: import from our local map, NOT from @designcombo/transitions.
+// @designcombo/transitions only has its own built-in kinds; our custom
+// presentations (push, glitch, colorSplit, dreamFade, squeeze, crossZoom, …)
+// live here and would be undefined in the package's Transitions export → crash.
+import { Transitions } from "../features/editor/player/transition-presentations";
 
 interface VideoCompositionProps {
 	trackItemsMap: any;
@@ -92,21 +97,33 @@ function resolveTrackItemSrcs(
 }
 
 /**
- * Main Video Composition rendered by Remotion
- * Uses the same rendering logic as the editor preview
- * but adapted for server-side rendering.
+ * Main Video Composition rendered by Remotion (Lambda + local renderer).
+ *
+ * Defensive rules applied throughout:
+ *  - Every trackItemsMap lookup is null-checked before use
+ *  - Unknown item.type → skip (no crash)
+ *  - Unknown transition kind → fall back to "fade" (no crash)
+ *  - Orphaned IDs in transition groups → skip item
+ *  - Missing firstItem in a group → skip the whole group
  */
 export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
 	const frame = useCurrentFrame();
-	const { trackItemIds, transitionsMap, fps, size } = props;
+	const {
+		trackItemIds,
+		fps,
+		size,
+	} = props;
+
+	// Guard: transitionsMap may be absent on older saved projects
+	const transitionsMap: Record<string, any> = props.transitionsMap ?? {};
 
 	// Resolve any localhost proxy URLs back to direct R2 CDN URLs
 	// so Remotion's Puppeteer renderer can fetch them without needing localhost
-	const trackItemsMap = resolveTrackItemSrcs(props.trackItemsMap);
+	const trackItemsMap = resolveTrackItemSrcs(props.trackItemsMap ?? {});
 
 	// Group items for transitions
 	const groupedItems = groupTrackItems({
-		trackItemIds,
+		trackItemIds: trackItemIds ?? [],
 		transitionsMap,
 		trackItemsMap,
 	});
@@ -121,8 +138,20 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
 		>
 			<FontFaceInjector trackItemsMap={trackItemsMap} />
 			{groupedItems.map((group, index) => {
+				// ── Single item (no transition) ─────────────────────────────────────
 				if (group.length === 1) {
 					const item = trackItemsMap[group[0].id];
+					// Guard: orphaned id — item was deleted after state was saved
+					if (!item) return null;
+
+					// Guard: unknown item type → skip instead of crashing
+					if (!SequenceItem[item.type]) {
+						console.warn(
+							`[VideoComposition] Unknown item type "${item.type}" (id: ${item.id}) — skipping`,
+						);
+						return null;
+					}
+
 					// Display-window guard: skip items outside their display.from / display.to range
 					const itemFromFrame = Math.round(
 						((item.display?.from ?? 0) / 1000) * fps,
@@ -131,6 +160,7 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
 						((item.display?.to ?? 0) / 1000) * fps,
 					);
 					if (frame < itemFromFrame || frame >= itemToFrame) return null;
+
 					return SequenceItem[item.type](item, {
 						fps,
 						handleTextChange: () => {},
@@ -142,26 +172,64 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
 					});
 				}
 
-				// Render items with transition
+				// ── Transition group ────────────────────────────────────────────────
 				const firstItem = trackItemsMap[group[0].id];
-				const from = Math.round(((firstItem.display?.from ?? 0) / 1000) * fps);
+				// Guard: first item missing from map (state corruption / orphaned id)
+				if (!firstItem) {
+					console.warn(
+						`[VideoComposition] group[0].id "${group[0].id}" not in trackItemsMap — skipping transition group`,
+					);
+					return null;
+				}
+
+				const from = Math.round(
+					((firstItem.display?.from ?? 0) / 1000) * fps,
+				);
 
 				return (
 					<TransitionSeries from={from} key={index}>
 						{group.map((item) => {
+							// ── Transition presentation ─────────────────────────────
 							if (item.type === "transition") {
 								const durationInFrames = Math.max(
 									1,
-									Math.round((item.duration / 1000) * fps),
+									Math.round(((item as any).duration / 1000) * fps),
 								);
-								return Transitions[item.kind]({
+								// Guard: unknown kind → fall back to fade, never crash the render
+								const kind = Transitions[(item as any).kind]
+									? (item as any).kind
+									: "fade";
+								if (!(item as any).kind || !(Transitions[(item as any).kind])) {
+									console.warn(
+										`[VideoComposition] Unknown transition kind "${(item as any).kind}" — falling back to fade`,
+									);
+								}
+								return Transitions[kind]({
 									durationInFrames,
 									...size,
 									id: item.id,
-									direction: item.direction,
+									direction: (item as any).direction,
+									color: (item as any).color,
 								});
 							}
-							return SequenceItem[item.type](trackItemsMap[item.id], {
+
+							// ── Track item inside a transition group ────────────────
+							const trackItem = trackItemsMap[item.id];
+							// Guard: orphaned id in transition group
+							if (!trackItem) {
+								console.warn(
+									`[VideoComposition] Orphaned id "${item.id}" in transition group — skipping`,
+								);
+								return null;
+							}
+							// Guard: unknown item type inside transition group
+							if (!SequenceItem[trackItem.type]) {
+								console.warn(
+									`[VideoComposition] Unknown item type "${trackItem.type}" in transition group (id: ${item.id}) — skipping`,
+								);
+								return null;
+							}
+							return SequenceItem[trackItem.type](trackItem, {
 								fps,
 								handleTextChange: () => {},
 								onTextBlur: () => {},

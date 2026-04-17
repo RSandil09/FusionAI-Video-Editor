@@ -77,7 +77,7 @@ const SNAP_THRESHOLD_PX = 8;
 const RULER_H = 24;
 
 // ─── Transition zone width (px) ───────────────────────────────────────────────
-const TRANSITION_W = 24;
+const TRANSITION_W = 40;
 
 export class CanvasEngine {
 	// ── Canvas / DOM ─────────────────────────────────────────────────────────────
@@ -417,10 +417,7 @@ export class CanvasEngine {
 		// 1 — Track row backgrounds
 		this.renderTrackRows(ctx);
 
-		// 2 — Transition zones
-		this.renderTransitions(ctx);
-
-		// 2b — Cross-track drop target highlight
+		// 2 — Cross-track drop target highlight
 		if (this.dropHighlightTrackId) {
 			const row = this.trackRows.find(
 				(r) => r.id === this.dropHighlightTrackId,
@@ -462,7 +459,10 @@ export class CanvasEngine {
 			}
 		}
 
-		// 4 — Muted / locked overlays on top of items
+		// 4 — Transition badges + DnD hover zones (on top of items)
+		this.renderTransitions(ctx);
+
+		// 4b — Muted / locked overlays on top of items
 		this.renderTrackStateOverlays(ctx);
 
 		// 5 — Snap guide line
@@ -615,55 +615,135 @@ export class CanvasEngine {
 	// ── Transition rendering ──────────────────────────────────────────────────────
 
 	private renderTransitions(ctx: CanvasRenderingContext2D) {
-		// Group items by track row
+		// Build a set of fromId values that have an active (non-"none") transition
+		// so the badge loop below can skip drawing zones that already have a badge.
+		const activeTransitionFromIds = new Set<string>();
+		for (const tr of Object.values(this.transitionsMap)) {
+			if ((tr as any).kind && (tr as any).kind !== "none") {
+				activeTransitionFromIds.add((tr as any).fromId);
+			}
+		}
+
+		// ── 1. Draw DnD hover zone on adjacent-clip boundaries ───────────────────
 		for (const row of this.trackRows) {
 			const rowItems = this.items.filter((it) => row.itemIds.includes(it.id));
-			// Sort by start position
 			rowItems.sort((a, b) => a.left - b.left);
 
 			for (let i = 0; i < rowItems.length - 1; i++) {
 				const a = rowItems[i];
 				const b = rowItems[i + 1];
-				// Adjacent items — draw transition zone
 				const gap = b.left - (a.left + a.width);
-				if (Math.abs(gap) < 4) {
+				if (Math.abs(gap) < 32) {
 					const isDndTarget =
 						this.dndHoverZone?.fromId === a.id &&
 						this.dndHoverZone?.toId === b.id;
-					this.renderTransitionZone(
-						ctx,
-						a.left + a.width - TRANSITION_W / 2,
-						row.top,
-						TRANSITION_W,
-						row.height,
-						isDndTarget,
-					);
+
+					// Only draw the gradient zone when dragging over — otherwise the
+					// badge (drawn in step 2) already marks the boundary.
+					if (isDndTarget) {
+						this.renderTransitionZone(
+							ctx,
+							a.left + a.width - TRANSITION_W / 2,
+							row.top,
+							TRANSITION_W,
+							row.height,
+							true,
+						);
+					}
 				}
 			}
 		}
 
-		// Also render named transitions from state
+		// ── 2. Draw badges for every stored (active) transition ──────────────────
+		// Use the fromId item's right edge as the boundary x-coordinate.
 		for (const [, tr] of Object.entries(this.transitionsMap)) {
-			const zoom = this.lastScale?.zoom ?? 1;
-			const x =
-				timeMsToUnits((tr as any).startTime ?? 0, zoom) +
-				this.spacing.left -
-				TRANSITION_W / 2;
+			const kind: string = (tr as any).kind ?? "";
+			if (!kind || kind === "none") continue;
+
+			const fromItem = this.items.find((it) => it.id === (tr as any).fromId);
+			if (!fromItem) continue;
+
 			const rowForTr = this.trackRows.find(
 				(r) =>
 					r.itemIds.includes((tr as any).fromId) ||
 					r.itemIds.includes((tr as any).toId),
 			);
-			if (rowForTr) {
-				this.renderTransitionZone(
-					ctx,
-					x,
-					rowForTr.top,
-					TRANSITION_W,
-					rowForTr.height,
-				);
-			}
+			if (!rowForTr) continue;
+
+			const cx = fromItem.left + fromItem.width; // exact clip boundary
+			this.renderTransitionBadge(ctx, cx, rowForTr.top, rowForTr.height, kind);
 		}
+	}
+
+	/**
+	 * Draws a CapCut-style transition badge at the boundary between two clips.
+	 *
+	 * Visual: a small rounded pill centred on `cx`, sitting near the bottom of the
+	 * track row, containing two inward-pointing triangles (▶◀) that indicate a
+	 * transition is applied at that cut point.
+	 */
+	private renderTransitionBadge(
+		ctx: CanvasRenderingContext2D,
+		cx: number,   // horizontal centre of the boundary
+		rowTop: number,
+		rowHeight: number,
+		_kind: string, // reserved for future per-kind icons
+	) {
+		const PILL_W = 28;
+		const PILL_H = 16;
+		const RADIUS = PILL_H / 2;
+
+		// Position: vertically centred in the row
+		const py = rowTop + (rowHeight - PILL_H) / 2;
+		const px = cx - PILL_W / 2;
+
+		ctx.save();
+
+		// ── Pill background ──────────────────────────────────────────────────────
+		ctx.beginPath();
+		ctx.roundRect(px, py, PILL_W, PILL_H, RADIUS);
+		ctx.fillStyle = "rgba(99,102,241,0.92)";
+		ctx.fill();
+
+		// ── Thin white border ────────────────────────────────────────────────────
+		ctx.strokeStyle = "rgba(255,255,255,0.45)";
+		ctx.lineWidth = 1;
+		ctx.stroke();
+
+		// ── Two inward-pointing triangles (◀ ▶) ─────────────────────────────────
+		const triH = 6;   // triangle height
+		const triW = 5;   // triangle base half-width
+		const midY = py + PILL_H / 2;
+		const gap = 3;    // horizontal gap between tip and centre
+
+		// Left triangle ▶ (points right, towards centre)
+		ctx.beginPath();
+		ctx.moveTo(cx - gap - triH, midY - triW);
+		ctx.lineTo(cx - gap,         midY);
+		ctx.lineTo(cx - gap - triH, midY + triW);
+		ctx.closePath();
+		ctx.fillStyle = "rgba(255,255,255,0.95)";
+		ctx.fill();
+
+		// Right triangle ◀ (points left, towards centre)
+		ctx.beginPath();
+		ctx.moveTo(cx + gap + triH, midY - triW);
+		ctx.lineTo(cx + gap,         midY);
+		ctx.lineTo(cx + gap + triH, midY + triW);
+		ctx.closePath();
+		ctx.fill();
+
+		// ── Thin vertical separator line at the exact cut ────────────────────────
+		ctx.strokeStyle = "rgba(255,255,255,0.3)";
+		ctx.lineWidth = 1;
+		ctx.setLineDash([2, 2]);
+		ctx.beginPath();
+		ctx.moveTo(cx, rowTop);
+		ctx.lineTo(cx, rowTop + rowHeight);
+		ctx.stroke();
+		ctx.setLineDash([]);
+
+		ctx.restore();
 	}
 
 	private renderTransitionZone(
@@ -911,7 +991,10 @@ export class CanvasEngine {
 				const a = rowItems[i];
 				const b = rowItems[i + 1];
 				const gap = b.left - (a.left + a.width);
-				if (Math.abs(gap) >= 4) continue; // not adjacent
+				// Skip clips that are far apart (not adjacent).
+				// 32 px is generous enough to absorb floating-point rounding.
+				if (Math.abs(gap) >= 32) continue;
+				// Widen the hit zone to TRANSITION_W centered on the boundary.
 				const zoneLeft = a.left + a.width - TRANSITION_W / 2;
 				const zoneRight = zoneLeft + TRANSITION_W;
 				if (cx >= zoneLeft && cx <= zoneRight) {
@@ -1393,7 +1476,9 @@ export class CanvasEngine {
 			return;
 		}
 		e.preventDefault();
-		e.dataTransfer!.dropEffect = "copy";
+		// Must match effectAllowed="move" set by the Draggable component.
+		// Mismatching (e.g. "copy") causes Firefox to suppress the drop event entirely.
+		e.dataTransfer!.dropEffect = "move";
 
 		const [cx, cy] = this.screenToCanvas(e.clientX, e.clientY);
 		const zone = this.getTransitionZoneAt(cx, cy);
@@ -1410,18 +1495,31 @@ export class CanvasEngine {
 		this.canvas.style.cursor = "default";
 		this.requestRenderAll();
 
-		if (!this.opts.onTransitionZoneClick) return;
+		// Recover the transition data from the drag payload.
+		// The browser lowercases dataTransfer type keys, so we use types[0] as the
+		// key to call getData() — which returns the VALUE (not lowercased).
+		let transitionData: unknown = null;
 		try {
-			const type = e.dataTransfer?.types?.[0] ?? "";
-			const data = JSON.parse(type);
-			if (data?.type !== "transition") return;
+			const typeKey = e.dataTransfer?.types?.[0] ?? "";
+			// Validate via the lowercased key first
+			const keyObj = JSON.parse(typeKey);
+			if (keyObj?.type !== "transition") return;
+			// Get the original (non-lowercased) value
+			const raw = e.dataTransfer?.getData(typeKey) ?? "";
+			transitionData = raw ? JSON.parse(raw) : keyObj;
 		} catch {
 			return;
 		}
 
 		const [cx, cy] = this.screenToCanvas(e.clientX, e.clientY);
 		const zone = this.getTransitionZoneAt(cx, cy);
-		if (zone) {
+		if (!zone) return;
+
+		if (this.opts.onTransitionDrop) {
+			// Apply the dragged transition directly — no picker needed.
+			this.opts.onTransitionDrop(zone.fromId, zone.toId, transitionData);
+		} else if (this.opts.onTransitionZoneClick) {
+			// Fallback: open the picker if no direct-apply handler is wired up.
 			this.opts.onTransitionZoneClick(zone.fromId, zone.toId, e.clientX, e.clientY);
 		}
 	};

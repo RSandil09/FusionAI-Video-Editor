@@ -42,6 +42,9 @@ const stateManager = new StateManager({
 		height: 1920,
 	},
 });
+// Make the singleton available to any component via the Zustand store.
+// Called at module-init time (outside React) so it's ready before first render.
+useStore.getState().setStateManager(stateManager);
 
 interface EditorProps {
 	initialState?: any;
