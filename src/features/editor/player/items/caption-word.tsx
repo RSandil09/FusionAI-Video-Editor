@@ -115,6 +115,9 @@ interface CaptionWordProps {
 	showObject: string;
 	lineIndex?: number;
 	currentLine?: number;
+	/** Absolute Remotion frame passed from caption.tsx — used during Lambda rendering
+	 *  where playerRef is null and useCurrentPlayerFrame always returns 0. */
+	absoluteFrame?: number;
 }
 
 export const CaptionWord: React.FC<CaptionWordProps> = ({
@@ -133,10 +136,15 @@ export const CaptionWord: React.FC<CaptionWordProps> = ({
 	showObject,
 	lineIndex,
 	currentLine,
+	absoluteFrame,
 }) => {
 	const fps = 30;
 	const { playerRef } = useStore();
-	const currentFrame = useCurrentPlayerFrame(playerRef!);
+	const playerFrame = useCurrentPlayerFrame(playerRef!);
+	// Prefer the absolute frame injected by caption.tsx (works in both browser and
+	// Lambda). Fall back to playerFrame only when absoluteFrame is not provided
+	// (e.g. legacy call-sites or unit tests).
+	const currentFrame = absoluteFrame !== undefined ? absoluteFrame : playerFrame;
 	const { start, end } = word;
 	const startAtFrame = ((start + offsetFrom) / 1000) * fps;
 	const endAtFrame = ((end + offsetFrom) / 1000) * fps;

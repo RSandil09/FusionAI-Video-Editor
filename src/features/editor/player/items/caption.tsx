@@ -104,6 +104,7 @@ export default function Caption({
 						fps,
 						currentFrame,
 						globalOpacity,
+						frame, // absolute Remotion frame — fixes word highlighting in Lambda renders
 					)}
 				</div>
 			</ContentAnim>
@@ -388,6 +389,7 @@ function renderWords(
 	fps: number,
 	currentFrame: number,
 	globalOpacity?: number,
+	absoluteFrame?: number,
 ) {
 	if (
 		updatedDetails?.showObject === "line" &&
@@ -401,6 +403,7 @@ function renderWords(
 			fps,
 			currentFrame,
 			globalOpacity,
+			absoluteFrame,
 		);
 	} else if (updatedDetails?.animation === "customAnimation1") {
 		return renderCustomAnimation1Words(
@@ -409,6 +412,7 @@ function renderWords(
 			scaleFactor,
 			offsetFrom,
 			globalOpacity,
+			absoluteFrame,
 		);
 	} else {
 		return renderStandardWords(
@@ -417,6 +421,7 @@ function renderWords(
 			scaleFactor,
 			offsetFrom,
 			globalOpacity,
+			absoluteFrame,
 		);
 	}
 }
@@ -429,6 +434,7 @@ function renderLineBasedWords(
 	fps: number,
 	currentFrame: number,
 	globalOpacity?: number,
+	absoluteFrame?: number,
 ) {
 	const wordsPerLine = Math.ceil(
 		item.details.words.length / updatedDetails.linesPerCaption,
@@ -473,6 +479,7 @@ function renderLineBasedWords(
 						undefined,
 						lineIndex,
 						currentLine,
+						absoluteFrame,
 					)}
 					key={`${lineIndex}-${wordIndex}`}
 				/>
@@ -487,6 +494,7 @@ function renderCustomAnimation1Words(
 	scaleFactor: number,
 	offsetFrom: number,
 	globalOpacity?: number,
+	absoluteFrame?: number,
 ) {
 	const nonKeywordWords = item.details.words.filter(
 		(word: any) => !word.is_keyword,
@@ -527,6 +535,9 @@ function renderCustomAnimation1Words(
 				updatedDetails.animation || "",
 				globalOpacity,
 				"word",
+				undefined,
+				undefined,
+				absoluteFrame,
 			)}
 			key={index}
 		/>
@@ -539,6 +550,7 @@ function renderStandardWords(
 	scaleFactor: number,
 	offsetFrom: number,
 	globalOpacity?: number,
+	absoluteFrame?: number,
 ) {
 	return item.details.words.map((word: any, index: number) => (
 		<CaptionWord
@@ -549,6 +561,10 @@ function renderStandardWords(
 				offsetFrom,
 				updatedDetails.animation || "",
 				globalOpacity,
+				undefined,
+				undefined,
+				undefined,
+				absoluteFrame,
 			)}
 			key={index}
 		/>
@@ -566,6 +582,7 @@ const createCaptionWordProps = (
 	showObject?: string,
 	lineIndex?: number,
 	currentLine?: number,
+	absoluteFrame?: number,
 ) => ({
 	word,
 	offsetFrom,
@@ -582,4 +599,5 @@ const createCaptionWordProps = (
 	showObject: showObject || updatedDetails?.showObject || "page",
 	lineIndex,
 	currentLine,
+	absoluteFrame,
 });
