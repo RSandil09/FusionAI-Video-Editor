@@ -4,12 +4,17 @@ import { BoxAnim, ContentAnim, MaskAnim } from "@designcombo/animations";
 import { calculateContainerStyles, calculateMediaStyles } from "../styles";
 import { getAnimations } from "../../utils/get-animations";
 import { calculateFrames } from "../../utils/frames";
-import { Video as RemotionVideo } from "remotion";
+import { Video as RemotionVideo, getRemotionEnvironment } from "remotion";
 
-// Ensure video uses proxy URL (same URL that works when opened in new tab)
-// During Remotion server render, use direct URLs as-is - no localhost proxy available
+// Ensure video uses proxy URL for browser playback.
+// During Lambda/server rendering, Puppeteer cannot reach the Next.js proxy route,
+// so we return the src unchanged — VideoComposition.resolveTrackItemSrcs has already
+// stripped any proxy wrapper leaving a direct R2 URL.
 function ensureVideoUrl(src: string): string {
 	if (!src) return src;
+
+	// Skip all proxy logic during server-side rendering (Lambda / CLI)
+	if (getRemotionEnvironment().isRendering) return src;
 
 	if (src.includes("/api/video-proxy")) return src;
 	if (src.includes("/api/image-proxy")) {

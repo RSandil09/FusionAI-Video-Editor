@@ -11,7 +11,8 @@
 		"format": "biome format . --write",
 		"format:check": "biome format .",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"remotion:deploy": "npx remotion lambda sites create src/remotion/index.tsx --site-name=video-editor"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.986.0",
