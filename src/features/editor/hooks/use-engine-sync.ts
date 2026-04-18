@@ -118,6 +118,34 @@ function _applyTransition(
 }
 
 /**
+ * Update properties of an existing transition in place (duration, direction, etc.)
+ * without changing the kind or re-creating the transition entry.
+ */
+export function updateTransition(
+	stateManager: any,
+	transitionId: string,
+	patch: Partial<{ duration: number; direction: string }>,
+) {
+	try {
+		const current = stateManager.getState();
+		const existing = current.transitionsMap?.[transitionId];
+		if (!existing) {
+			console.warn("[updateTransition] Transition not found:", transitionId);
+			return;
+		}
+		const updated = { ...existing, ...patch };
+		const newTransitionsMap = { ...current.transitionsMap, [transitionId]: updated };
+		stateManager.updateState(
+			{ transitionsMap: newTransitionsMap },
+			{ updateHistory: true, kind: "update" },
+		);
+		useStore.getState().setState({ transitionsMap: newTransitionsMap });
+	} catch (err) {
+		console.error("[updateTransition] Failed:", err);
+	}
+}
+
+/**
  * Build CanvasEngine option callbacks that dispatch back into @designcombo/state.
  *
  * There are TWO separate selection events:
@@ -149,6 +177,11 @@ export function buildEngineCallbacks(
 		onSelectionChange: (ids: string[]) => {
 			dispatch(LAYER_SELECT, { payload: { trackItemIds: ids } });
 			dispatch(LAYER_SELECTION, { payload: { activeIds: ids } });
+			// Clear any active transition selection so the right panel switches back
+			// to the track item control panel.
+			if (ids.length > 0) {
+				useStore.getState().setActiveTransitionId(null);
+			}
 		},
 		onItemMove: (id: string, display: IDisplay) => {
 			// Directly update the stateManager — LAYER_MOVE dispatch does NOT work because

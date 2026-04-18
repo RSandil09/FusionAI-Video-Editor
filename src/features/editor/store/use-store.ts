@@ -64,6 +64,9 @@ interface ITimelineStore {
 	setMarkers: (
 		markers: { id: string; timeMs: number; label: string; color: string }[],
 	) => void;
+	/** The ID of the currently "selected" transition (for the right panel) */
+	activeTransitionId: string | null;
+	setActiveTransitionId: (id: string | null) => void;
 }
 
 const useStore = create<ITimelineStore>((set) => ({
@@ -136,6 +139,8 @@ const useStore = create<ITimelineStore>((set) => ({
 	setLockedTrackIds: (ids) => set({ lockedTrackIds: ids }),
 	markers: [],
 	setMarkers: (markers) => set({ markers }),
+	activeTransitionId: null,
+	setActiveTransitionId: (id) => set({ activeTransitionId: id }),
 }));
 
 export default useStore;

@@ -128,7 +128,18 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 			fps,
 			playerRef,
 			engineRef,
-			(fromId, toId, x, y) => setPickerState({ fromId, toId, x, y }),
+			(fromId, toId, x, y) => {
+				setPickerState({ fromId, toId, x, y });
+				// Find the transition between these two clips and set it as active
+				// so the right-side panel shows transition properties.
+				const state = stateManager.getState();
+				const entry = Object.values(state.transitionsMap ?? {}).find(
+					(t: any) => t.fromId === fromId && t.toId === toId && t.kind !== "none",
+				) as any;
+				if (entry?.id) {
+					useStore.getState().setActiveTransitionId(entry.id);
+				}
+			},
 		);
 
 		const eng = new CanvasEngine(canvasEl, {
@@ -332,6 +343,23 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 					onSelect={(transition: TransitionDef) => {
 						applyTransition(stateManager, pickerState.fromId, pickerState.toId, transition);
 						setPickerState(null);
+						// After applying, find the new transition entry so the right panel
+						// reflects the updated transition (or clears if "none" was selected).
+						if (transition.kind === "none") {
+							useStore.getState().setActiveTransitionId(null);
+						} else {
+							// Give stateManager a tick to commit before reading back
+							setTimeout(() => {
+								const state = stateManager.getState();
+								const entry = Object.values(state.transitionsMap ?? {}).find(
+									(t: any) =>
+										t.fromId === pickerState.fromId &&
+										t.toId === pickerState.toId &&
+										t.kind !== "none",
+								) as any;
+								useStore.getState().setActiveTransitionId(entry?.id ?? null);
+							}, 0);
+						}
 					}}
 					onClose={() => setPickerState(null)}
 				/>

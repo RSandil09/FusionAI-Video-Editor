@@ -17,30 +17,43 @@ import { AdvancedAudioEffects } from "./advanced-audio-effects";
 import useStore from "../store/use-store";
 import useLayoutStore from "../store/use-layout-store";
 import BasicCaption from "./basic-caption";
+import BasicTransition from "./basic-transition";
 import { LassoSelect } from "lucide-react";
 
 const Container = ({ children }: { children: React.ReactNode }) => {
-	const { activeIds, trackItemsMap, transitionsMap } = useStore();
+	const { activeIds, trackItemsMap, activeTransitionId } = useStore();
 	const [trackItem, setTrackItem] = useState<ITrackItem | null>(null);
 	const { setTrackItem: setLayoutTrackItem } = useLayoutStore();
 
 	useEffect(() => {
+		// When a transition is active, don't overwrite trackItem — the panel will
+		// render BasicTransition instead (checked in ControlItem).
+		if (activeTransitionId) return;
+
 		if (activeIds.length === 1) {
 			const [id] = activeIds;
-			const trackItem = trackItemsMap[id];
-			if (trackItem) {
-				setTrackItem(trackItem);
-				setLayoutTrackItem(trackItem);
-			} else {
+			const item = trackItemsMap[id];
+			if (item) {
+				setTrackItem(item);
+				setLayoutTrackItem(item);
 			}
 		} else {
 			setTrackItem(null);
 			setLayoutTrackItem(null);
 		}
-	}, [activeIds, trackItemsMap]);
+	}, [activeIds, trackItemsMap, activeTransitionId]);
+
+	// Clear the cached trackItem when a transition is selected so the panel
+	// doesn't flicker between the previous item and the transition panel.
+	useEffect(() => {
+		if (activeTransitionId) {
+			setTrackItem(null);
+			setLayoutTrackItem(null);
+		}
+	}, [activeTransitionId]);
 
 	return (
-		<div className="flex w-[272px] flex-none border-l border-border/60 bg-muted/50 backdrop-blur-sm hidden lg:block">
+		<div className="hidden lg:flex flex-col w-[272px] flex-none border-l border-border/60 bg-muted/50 backdrop-blur-sm overflow-hidden">
 			{React.cloneElement(children as React.ReactElement<any>, {
 				trackItem,
 			})}
@@ -54,6 +67,12 @@ const ActiveControlItem = ({
 	trackItem?: ITrackItemAndDetails;
 }) => {
 	const { typeControlItem } = useLayoutStore();
+	const { activeTransitionId } = useStore();
+
+	// Transition panel takes precedence over track item panel
+	if (activeTransitionId) {
+		return <BasicTransition transitionId={activeTransitionId} />;
+	}
 
 	if (!trackItem) {
 		return (

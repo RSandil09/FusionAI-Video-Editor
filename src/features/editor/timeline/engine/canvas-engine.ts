@@ -671,79 +671,128 @@ export class CanvasEngine {
 			if (!rowForTr) continue;
 
 			const cx = fromItem.left + fromItem.width; // exact clip boundary
-			this.renderTransitionBadge(ctx, cx, rowForTr.top, rowForTr.height, kind);
+			this.renderTransitionBadge(
+				ctx,
+				cx,
+				rowForTr.top,
+				rowForTr.height,
+				kind,
+				(tr as any).direction,
+			);
 		}
 	}
 
 	/**
 	 * Draws a CapCut-style transition badge at the boundary between two clips.
 	 *
-	 * Visual: a small rounded pill centred on `cx`, sitting near the bottom of the
-	 * track row, containing two inward-pointing triangles (▶◀) that indicate a
-	 * transition is applied at that cut point.
+	 * Shows the transition name (e.g. "Fade", "Push ←", "Dream Fade") inside an
+	 * indigo pill centred on the exact cut point, so the user can see at a glance
+	 * which transition is applied without opening the picker.
 	 */
 	private renderTransitionBadge(
 		ctx: CanvasRenderingContext2D,
-		cx: number,   // horizontal centre of the boundary
+		cx: number,        // horizontal centre of the clip boundary
 		rowTop: number,
 		rowHeight: number,
-		_kind: string, // reserved for future per-kind icons
+		kind: string,
+		direction?: string,
 	) {
-		const PILL_W = 28;
-		const PILL_H = 16;
-		const RADIUS = PILL_H / 2;
+		const label = this.formatTransitionLabel(kind, direction);
 
-		// Position: vertically centred in the row
+		const PILL_H = 18;
+		const FONT_SIZE = 9;
+		const RADIUS = PILL_H / 2;
+		const H_PAD = 10; // horizontal padding inside the pill
+
+		// Measure the label so the pill is exactly wide enough
+		ctx.save();
+		ctx.font = `600 ${FONT_SIZE}px -apple-system, BlinkMacSystemFont, sans-serif`;
+		const textW = ctx.measureText(label).width;
+		const PILL_W = Math.max(32, textW + H_PAD * 2);
+
+		// Vertically centred in the row
 		const py = rowTop + (rowHeight - PILL_H) / 2;
 		const px = cx - PILL_W / 2;
 
-		ctx.save();
-
-		// ── Pill background ──────────────────────────────────────────────────────
-		ctx.beginPath();
-		ctx.roundRect(px, py, PILL_W, PILL_H, RADIUS);
-		ctx.fillStyle = "rgba(99,102,241,0.92)";
-		ctx.fill();
-
-		// ── Thin white border ────────────────────────────────────────────────────
-		ctx.strokeStyle = "rgba(255,255,255,0.45)";
+		// ── Vertical dashed cut line ─────────────────────────────────────────────
+		ctx.strokeStyle = "rgba(255,255,255,0.25)";
 		ctx.lineWidth = 1;
-		ctx.stroke();
-
-		// ── Two inward-pointing triangles (◀ ▶) ─────────────────────────────────
-		const triH = 6;   // triangle height
-		const triW = 5;   // triangle base half-width
-		const midY = py + PILL_H / 2;
-		const gap = 3;    // horizontal gap between tip and centre
-
-		// Left triangle ▶ (points right, towards centre)
-		ctx.beginPath();
-		ctx.moveTo(cx - gap - triH, midY - triW);
-		ctx.lineTo(cx - gap,         midY);
-		ctx.lineTo(cx - gap - triH, midY + triW);
-		ctx.closePath();
-		ctx.fillStyle = "rgba(255,255,255,0.95)";
-		ctx.fill();
-
-		// Right triangle ◀ (points left, towards centre)
-		ctx.beginPath();
-		ctx.moveTo(cx + gap + triH, midY - triW);
-		ctx.lineTo(cx + gap,         midY);
-		ctx.lineTo(cx + gap + triH, midY + triW);
-		ctx.closePath();
-		ctx.fill();
-
-		// ── Thin vertical separator line at the exact cut ────────────────────────
-		ctx.strokeStyle = "rgba(255,255,255,0.3)";
-		ctx.lineWidth = 1;
-		ctx.setLineDash([2, 2]);
+		ctx.setLineDash([2, 3]);
 		ctx.beginPath();
 		ctx.moveTo(cx, rowTop);
 		ctx.lineTo(cx, rowTop + rowHeight);
 		ctx.stroke();
 		ctx.setLineDash([]);
 
+		// ── Pill background ──────────────────────────────────────────────────────
+		ctx.beginPath();
+		ctx.roundRect(px, py, PILL_W, PILL_H, RADIUS);
+		ctx.fillStyle = "rgba(99,102,241,0.95)";
+		ctx.fill();
+
+		// ── Subtle inner border ──────────────────────────────────────────────────
+		ctx.strokeStyle = "rgba(255,255,255,0.3)";
+		ctx.lineWidth = 0.75;
+		ctx.stroke();
+
+		// ── Small ◆ diamond marker on left ──────────────────────────────────────
+		const dmSize = 3;
+		const dmX = px + RADIUS;           // left cap centre
+		const dmY = py + PILL_H / 2;
+		ctx.beginPath();
+		ctx.moveTo(dmX,          dmY - dmSize); // top
+		ctx.lineTo(dmX + dmSize, dmY);           // right
+		ctx.lineTo(dmX,          dmY + dmSize); // bottom
+		ctx.lineTo(dmX - dmSize, dmY);           // left
+		ctx.closePath();
+		ctx.fillStyle = "rgba(255,255,255,0.85)";
+		ctx.fill();
+
+		// ── Transition name text ─────────────────────────────────────────────────
+		ctx.fillStyle = "rgba(255,255,255,0.97)";
+		ctx.textBaseline = "middle";
+		ctx.textAlign = "center";
+		ctx.fillText(label, cx, py + PILL_H / 2);
+
 		ctx.restore();
+	}
+
+	/**
+	 * Converts a camelCase transition kind + optional direction into a short
+	 * human-readable label for the timeline badge.
+	 *
+	 * Examples:
+	 *   "fade"           → "Fade"
+	 *   "dreamFade"      → "Dream Fade"
+	 *   "push", "left"   → "Push ←"
+	 *   "slide", "up"    → "Slide ↑"
+	 *   "colorSplit"     → "Color Split"
+	 */
+	private formatTransitionLabel(kind: string, direction?: string): string {
+		// camelCase → "Title Case Words"
+		const words = kind
+			.replace(/([A-Z])/g, " $1")
+			.trim()
+			.split(/\s+/)
+			.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+			.join(" ");
+
+		if (!direction) return words;
+
+		const arrows: Record<string, string> = {
+			left: "←",
+			right: "→",
+			up: "↑",
+			down: "↓",
+			"from-left": "←",
+			"from-right": "→",
+			"from-top": "↑",
+			"from-bottom": "↓",
+			horizontal: "↔",
+			vertical: "↕",
+		};
+		const arrow = arrows[direction];
+		return arrow ? `${words} ${arrow}` : words;
 	}
 
 	private renderTransitionZone(
