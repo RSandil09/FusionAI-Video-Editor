@@ -44,6 +44,16 @@ export interface CaptionOptions {
 	 * Default: 0.75s
 	 */
 	silenceGapS?: number;
+	/**
+	 * Start of the visible trim window in the source video, in seconds.
+	 * Words before this point are excluded. Default: 0 (no trim).
+	 */
+	trimFromS?: number;
+	/**
+	 * End of the visible trim window in the source video, in seconds.
+	 * Words after this point are excluded. Default: Infinity (no trim).
+	 */
+	trimToS?: number;
 }
 
 interface CaptionsInput {
@@ -123,8 +133,27 @@ function createCaptionLines(
 	_fontInfo: FontInfo,      // kept for API compatibility
 	options: CaptionOptions,
 ): ICaptionLine[] {
-	const words = input.results.main.words;
-	if (!words || words.length === 0) return [];
+	const allWords = input.results.main.words;
+	if (!allWords || allWords.length === 0) return [];
+
+	// ── Trim window filtering ─────────────────────────────────────────────────
+	// trimFromS / trimToS are in source-video seconds.
+	// We keep only words that fall inside [trimFromS, trimToS] and shift their
+	// timestamps so t=0 is the start of the visible clip (not the raw file).
+	const trimFromS = options.trimFromS ?? 0;
+	const trimToS = options.trimToS ?? Infinity;
+
+	const words: Word[] = allWords
+		.filter((w) => w.end > trimFromS && w.start < trimToS)
+		.map((w) => ({
+			...w,
+			// Clamp word boundaries to the trim window, then subtract the trim offset
+			// so captions are relative to clip-start (t=0) rather than file-start.
+			start: Math.max(0, w.start - trimFromS),
+			end: Math.max(0, Math.min(w.end, trimToS) - trimFromS),
+		}));
+
+	if (words.length === 0) return [];
 
 	const maxWords = Math.max(1, options.maxWordsPerCaption ?? 4);
 	const silenceGapS = options.silenceGapS ?? 0.75;

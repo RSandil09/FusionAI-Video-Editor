@@ -90,12 +90,20 @@ export const Captions = () => {
 				fontUrl: fontInfo.url,
 				fontSize: 64,
 			};
+			// Pass trim window so only the visible portion of the source video
+			// is captioned. trim.from / trim.to are in milliseconds; convert to seconds.
+			const trimFromS = (trackItem.trim?.from ?? 0) / 1000;
+			// trim.to === 0 means "no end trim" in the player — treat as Infinity.
+			const trimToS = trackItem.trim?.to ? trackItem.trim.to / 1000 : Infinity;
+
 			const options = {
 				containerWidth: 800,
 				maxWordsPerCaption,
 				timingOffsetMs,
 				parentId: trackItem.id,
 				displayFrom: trackItem.display.from,
+				trimFromS,
+				trimToS,
 			};
 
 			if (fontInfo.url) {
