@@ -53,7 +53,7 @@ const Container = ({ children }: { children: React.ReactNode }) => {
 	}, [activeTransitionId]);
 
 	return (
-		<div className="hidden lg:flex flex-col w-[272px] flex-none border-l border-border/60 bg-muted/50 backdrop-blur-sm overflow-hidden">
+		<div className="hidden lg:flex flex-col w-[272px] flex-none h-full border-l border-border/60 bg-muted/50 backdrop-blur-sm overflow-hidden">
 			{React.cloneElement(children as React.ReactElement<any>, {
 				trackItem,
 			})}

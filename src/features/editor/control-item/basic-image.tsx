@@ -205,6 +205,25 @@ const BasicImage = ({
 		});
 	};
 
+	const handleChangeLockRatio = (locked: boolean) => {
+		dispatch(EDIT_OBJECT, {
+			payload: {
+				[trackItem.id]: {
+					details: {
+						lockAspectRatio: locked,
+					},
+				},
+			},
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: {
+				...prev.details,
+				lockAspectRatio: locked,
+			},
+		}));
+	};
+
 	const onChangeBoxShadow = (boxShadow: IBoxShadow) => {
 		dispatch(EDIT_OBJECT, {
 			payload: {
@@ -264,7 +283,10 @@ const BasicImage = ({
 				<div className="flex flex-col gap-2">
 					<Label className="font-sans text-xs font-semibold">Basic</Label>
 
-					<AspectRatio />
+					<AspectRatio
+						value={(properties.details as any).lockAspectRatio ?? true}
+						onChange={handleChangeLockRatio}
+					/>
 					<Rounded
 						onChange={(v: number) => onChangeBorderRadius(v)}
 						value={properties.details.borderRadius as number}

@@ -157,6 +157,25 @@ const BasicVideo = ({
 		setProperties(trackItem);
 	}, [trackItem]);
 
+	const handleChangeLockRatio = (locked: boolean) => {
+		dispatch(EDIT_OBJECT, {
+			payload: {
+				[trackItem.id]: {
+					details: {
+						lockAspectRatio: locked,
+					},
+				},
+			},
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: {
+				...prev.details,
+				lockAspectRatio: locked,
+			},
+		}));
+	};
+
 	const handleChangeSpeed = (v: number) => {
 		dispatch(EDIT_OBJECT, {
 			payload: {
@@ -198,7 +217,10 @@ const BasicVideo = ({
 					<Label className="font-sans text-xs font-semibold text-primary">
 						Basic
 					</Label>
-					<AspectRatio />
+					<AspectRatio
+						value={(properties.details as any).lockAspectRatio ?? true}
+						onChange={handleChangeLockRatio}
+					/>
 					<Volume
 						onChange={(v: number) => handleChangeVolume(v)}
 						value={properties.details.volume ?? 100}
