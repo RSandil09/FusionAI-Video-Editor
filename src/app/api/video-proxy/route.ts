@@ -1,13 +1,14 @@
 import { logger } from "@/lib/logger";
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-export const maxDuration = 300; // 5 minutes for large videos
+// Edge runtime: globally distributed, no cold starts, ~10ms startup vs 1–3s for Node.js.
+// Since R2 is on Cloudflare infrastructure, Vercel Edge → R2 latency is minimal.
+export const runtime = "edge";
 
 // Retry configuration
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
-const FETCH_TIMEOUT_MS = 30000; // 30 seconds
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 500;
+const FETCH_TIMEOUT_MS = 25000; // Edge functions have a 30s wall-clock limit; keep margin
 
 /**
  * Fetch with timeout and retry logic

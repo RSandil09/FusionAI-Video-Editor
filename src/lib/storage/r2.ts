@@ -72,6 +72,7 @@ export async function uploadToR2(
 		Body: buffer,
 		ContentType: contentType,
 		ContentLength: buffer.length,
+		CacheControl: "public, max-age=31536000, immutable",
 	});
 
 	await client.send(command);
@@ -104,6 +105,9 @@ export async function getPresignedUploadUrl(
 		Bucket: bucketName,
 		Key: key,
 		ContentType: contentType,
+		// Stored as object metadata so Cloudflare CDN caches the object at the edge
+		// after first access. Without this, every request hits R2 origin.
+		CacheControl: "public, max-age=31536000, immutable",
 	});
 
 	const url = await getSignedUrl(client, command, { expiresIn });

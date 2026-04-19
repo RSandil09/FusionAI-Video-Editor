@@ -90,6 +90,9 @@ export async function uploadFile(
 		const xhr = new XMLHttpRequest();
 		xhr.open("PUT", presignedUrl);
 		xhr.setRequestHeader("Content-Type", file.type);
+		// Must match the CacheControl in the presigned PutObjectCommand — R2 stores
+		// this as object metadata so Cloudflare CDN caches it at the edge after first access.
+		xhr.setRequestHeader("Cache-Control", "public, max-age=31536000, immutable");
 
 		xhr.upload.onprogress = (e) => {
 			if (onProgress && e.lengthComputable) {
