@@ -119,6 +119,9 @@ export async function GET(request: NextRequest) {
 
 		const fetchHeaders: HeadersInit = {
 			Accept: "*/*",
+			// Keep-alive reuses the TCP connection from this Edge PoP to R2,
+			// saving ~100ms handshake overhead on every range request.
+			Connection: "keep-alive",
 			"User-Agent":
 				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 		};
@@ -178,8 +181,11 @@ export async function GET(request: NextRequest) {
 		// Enable range requests
 		responseHeaders.set("Accept-Ranges", "bytes");
 
-		// Cache for performance
+		// Cache for performance — Vercel's CDN reads this and caches the response at
+		// the edge PoP. Vary: Range tells the CDN to cache each byte-range separately
+		// so seeking requests also get served from CDN cache after first access.
 		responseHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
+		responseHeaders.set("Vary", "Range");
 
 		// CORS headers - restrict to same origin; browsers send Origin on cross-origin media requests
 		const requestOrigin = request.headers.get("origin");

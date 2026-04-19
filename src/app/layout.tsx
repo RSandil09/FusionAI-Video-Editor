@@ -51,6 +51,12 @@ export default async function RootLayout({
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
+				{/* Early connection hints — browser starts TLS handshake to the R2
+				    CDN domain before any video element requests it, saving 100-300ms
+				    on first video load. dns-prefetch is a lighter fallback for browsers
+				    that don't support preconnect. */}
+				<link rel="preconnect" href="https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev" crossOrigin="anonymous" />
+				<link rel="dns-prefetch" href="https://pub-760dc7f0a82e481197568d0a306385c6.r2.dev" />
 				{/*
 				  Inline script runs before React hydrates — reads localStorage and
 				  applies the "dark" class to <html> immediately, preventing any
