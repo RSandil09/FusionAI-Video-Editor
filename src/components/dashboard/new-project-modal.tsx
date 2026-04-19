@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { getIdToken } from "@/lib/auth/client";
+import { uploadFile as uploadFileToR2 } from "@/lib/upload-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -294,36 +295,16 @@ export default function NewProjectModal({
     setAssets((prev) => [...prev, { ...placeholder, _id: id } as any]);
 
     try {
-      const token = await getIdToken();
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const result = await new Promise<{ url: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/uploads");
-        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 100);
-            setAssets((prev) =>
-              prev.map((a) =>
-                (a as any)._id === id ? { ...a, progress: pct } : a,
-              ),
-            );
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const data = JSON.parse(xhr.responseText);
-            resolve({ url: data.upload?.url ?? data.url });
-          } else {
-            reject(new Error(`Upload failed: ${xhr.status}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network error during upload"));
-        xhr.send(formData);
+      // Use the presigned URL flow: browser → R2 directly, bypassing Vercel's
+      // 4.5 MB serverless body limit. Files of any size work with this path.
+      const result = await uploadFileToR2(file, (progress) => {
+        setAssets((prev) =>
+          prev.map((a) =>
+            (a as any)._id === id
+              ? { ...a, progress: progress.percentage }
+              : a,
+          ),
+        );
       });
 
       setAssets((prev) =>
