@@ -51,6 +51,7 @@ export const Captions = () => {
 	const [selectMediaItems, setSelectMediaItems] = useState<
 		{ label: string; value: string }[]
 	>([]);
+	// selectedMedia holds the track item ID (unique per clip, not the src URL)
 	const [selectedMedia, setSelectedMedia] = useState<string | undefined>();
 	const [selectedLanguage, setSelectedLanguage] = useState("en");
 	const [selectedFont, setSelectedFont] = useState(CAPTION_FONTS[0].family);
@@ -61,30 +62,26 @@ export const Captions = () => {
 	const [isGenerating, setIsGenerating] = useState(false);
 
 	useEffect(() => {
-		const mediaTrackItems = fetchMediaTrackItems(trackItemsMap);
-		setMediaTrackItems(mediaTrackItems);
-
-		const selectMediaOptions = createSelectMediaOptions(mediaTrackItems);
-		setSelectMediaItems(selectMediaOptions);
-
-		const groupedCaptions = groupCaptionItems(trackItemsMap);
-		setCaptionTrackItemsMap(groupedCaptions);
+		const items = fetchMediaTrackItems(trackItemsMap);
+		setMediaTrackItems(items);
+		setSelectMediaItems(createSelectMediaOptions(items));
+		setCaptionTrackItemsMap(groupCaptionItems(trackItemsMap));
 	}, [trackItemsMap]);
 
 	const handleSelectChange = (value: string) => {
 		setSelectedMedia(value);
 	};
 
-	const createCaptions = async (selectedMedia: string) => {
+	const createCaptions = async (selectedId: string) => {
 		setIsGenerating(true);
 		try {
-			const trackItem = mediaTrackItems.find(
-				(m) => m.details.src === selectedMedia,
-			);
+			// Look up by ID so each clip is treated independently
+			const trackItem = mediaTrackItems.find((m) => m.id === selectedId);
 
 			if (!trackItem) throw new Error("Track item not found");
 
-			const { url } = await transcribeMedia(selectedMedia, selectedLanguage);
+			const mediaSrc = (trackItem.details as any).src as string;
+			const { url } = await transcribeMedia(mediaSrc, selectedLanguage);
 			const jsonData = await fetchJsonFromUrl(url);
 
 			const fontInfo =
@@ -107,7 +104,7 @@ export const Captions = () => {
 			}
 
 			const captions = generateCaptions(
-				{ ...jsonData, sourceUrl: selectedMedia },
+				{ ...jsonData, sourceUrl: mediaSrc },
 				captionFontInfo,
 				options,
 			);
@@ -149,6 +146,7 @@ export const Captions = () => {
 					onLanguageChange={setSelectedLanguage}
 					onFontChange={setSelectedFont}
 					captionTrackItemsMap={captionTrackItemsMap}
+					mediaTrackItems={mediaTrackItems}
 					createCaptions={createCaptions}
 					isGenerating={isGenerating}
 				/>
@@ -172,6 +170,7 @@ const MediaSection = ({
 	onLanguageChange,
 	onFontChange,
 	captionTrackItemsMap,
+	mediaTrackItems,
 	createCaptions,
 	isGenerating,
 }: {
@@ -183,73 +182,79 @@ const MediaSection = ({
 	onLanguageChange: (value: string) => void;
 	onFontChange: (value: string) => void;
 	captionTrackItemsMap: Record<string, ITrackItem[]>;
-	createCaptions: (selectedMedia: string) => void;
+	mediaTrackItems: ITrackItem[];
+	createCaptions: (selectedId: string) => void;
 	isGenerating: boolean;
-}) => (
-	<div className="flex h-[calc(100%-4.5rem)] flex-col gap-3 px-4">
-		{/* Media selector */}
-		<Select value={selectedMedia} onValueChange={onSelectChange}>
-			<SelectTrigger className="w-full">
-				<SelectValue placeholder="Select media" />
-			</SelectTrigger>
-			<SelectContent className="z-[200]">
-				{selectMediaItems.map((item) => (
-					<SelectItem value={item.value} key={item.value}>
-						{item.label}
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
+}) => {
+	// Resolve the src of the currently selected item (selected by ID)
+	const selectedItem = mediaTrackItems.find((m) => m.id === selectedMedia);
+	const selectedSrc = selectedItem ? (selectedItem.details as any).src as string : undefined;
+	const existingCaptions = selectedSrc ? captionTrackItemsMap[selectedSrc] : undefined;
 
-		{/* Language + Font selectors */}
-		<div className="flex gap-2">
-			<Select value={selectedLanguage} onValueChange={onLanguageChange}>
-				<SelectTrigger className="flex-1">
-					<SelectValue placeholder="Language" />
+	return (
+		<div className="flex h-[calc(100%-4.5rem)] flex-col gap-3 px-4">
+			{/* Media selector — value is item ID, label is the filename */}
+			<Select value={selectedMedia} onValueChange={onSelectChange}>
+				<SelectTrigger className="w-full">
+					<SelectValue placeholder="Select media" />
 				</SelectTrigger>
 				<SelectContent className="z-[200]">
-					{LANGUAGES.map((lang) => (
-						<SelectItem value={lang.code} key={lang.code}>
-							{lang.label}
+					{selectMediaItems.map((item) => (
+						<SelectItem value={item.value} key={item.value}>
+							{item.label}
 						</SelectItem>
 					))}
 				</SelectContent>
 			</Select>
 
-			<Select value={selectedFont} onValueChange={onFontChange}>
-				<SelectTrigger className="flex-1">
-					<SelectValue placeholder="Font" />
-				</SelectTrigger>
-				<SelectContent className="z-[200]">
-					{CAPTION_FONTS.map((font) => (
-						<SelectItem value={font.family} key={font.family}>
-							{font.label}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-		</div>
+			{/* Language + Font selectors */}
+			<div className="flex gap-2">
+				<Select value={selectedLanguage} onValueChange={onLanguageChange}>
+					<SelectTrigger className="flex-1">
+						<SelectValue placeholder="Language" />
+					</SelectTrigger>
+					<SelectContent className="z-[200]">
+						{LANGUAGES.map((lang) => (
+							<SelectItem value={lang.code} key={lang.code}>
+								{lang.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 
-		{selectedMedia ? (
-			captionTrackItemsMap[selectedMedia] ? (
-				<div className="h-[calc(100vh-32rem)]">
-					<ScrollArea className="h-full">
-						<MediaWithCaptions
-							captionTrackItems={captionTrackItemsMap[selectedMedia]}
-						/>
-					</ScrollArea>
-				</div>
+				<Select value={selectedFont} onValueChange={onFontChange}>
+					<SelectTrigger className="flex-1">
+						<SelectValue placeholder="Font" />
+					</SelectTrigger>
+					<SelectContent className="z-[200]">
+						{CAPTION_FONTS.map((font) => (
+							<SelectItem value={font.family} key={font.family}>
+								{font.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</div>
+
+			{selectedMedia ? (
+				existingCaptions ? (
+					<div className="h-[calc(100vh-32rem)]">
+						<ScrollArea className="h-full">
+							<MediaWithCaptions captionTrackItems={existingCaptions} />
+						</ScrollArea>
+					</div>
+				) : (
+					<MediaWithNoCaptions
+						createCaptions={() => createCaptions(selectedMedia)}
+						isGenerating={isGenerating}
+					/>
+				)
 			) : (
-				<MediaWithNoCaptions
-					createCaptions={() => createCaptions(selectedMedia)}
-					isGenerating={isGenerating}
-				/>
-			)
-		) : (
-			<MediaNoSelected />
-		)}
-	</div>
-);
+				<MediaNoSelected />
+			)}
+		</div>
+	);
+};
 
 const MediaNoSelected = () => (
 	<div className="text-center text-sm text-muted-foreground">
@@ -369,10 +374,33 @@ const fetchMediaTrackItems = (trackItemsMap: ITrackItemsMap) => {
 	);
 };
 
+/** Extract a human-readable filename from a media src URL. */
+const getMediaLabel = (item: ITrackItem, index: number): string => {
+	const src = (item.details as any)?.src as string | undefined;
+	if (src) {
+		try {
+			// Strip query string then grab the last path segment
+			const pathname = new URL(src).pathname;
+			const filename = decodeURIComponent(pathname.split("/").pop() ?? "");
+			// Strip common UUID prefixes (e.g. "abc123_my-video.mp4" → "my-video.mp4")
+			const cleaned = filename.replace(/^[a-f0-9-]{8,}_/i, "");
+			if (cleaned && cleaned !== "undefined") return cleaned;
+		} catch {
+			// src is a relative or malformed URL — fall through
+			const filename = src.split("/").pop()?.split("?")[0] ?? "";
+			const decoded = decodeURIComponent(filename);
+			if (decoded && decoded !== "undefined") return decoded;
+		}
+	}
+	// Fall back to a numbered label so every item is unique
+	return `${item.type === "video" ? "Video" : "Audio"} ${index + 1}`;
+};
+
 const createSelectMediaOptions = (mediaTrackItems: ITrackItem[]) => {
-	return mediaTrackItems.map(({ name, details }) => ({
-		label: name,
-		value: details.src,
+	return mediaTrackItems.map((item, index) => ({
+		label: getMediaLabel(item, index),
+		// Use the item's unique ID as the value so duplicate-src clips are distinct
+		value: item.id,
 	}));
 };
 

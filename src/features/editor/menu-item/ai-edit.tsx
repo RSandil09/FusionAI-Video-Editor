@@ -67,6 +67,24 @@ interface HistoryItem {
 	created_at: string;
 }
 
+/** Extract a human-readable filename from a video track item's src URL. */
+const getVideoLabel = (item: ITrackItem, index: number): string => {
+	const src = (item.details as any)?.src as string | undefined;
+	if (src) {
+		try {
+			const pathname = new URL(src).pathname;
+			const filename = decodeURIComponent(pathname.split("/").pop() ?? "");
+			const cleaned = filename.replace(/^[a-f0-9-]{8,}_/i, "");
+			if (cleaned && cleaned !== "undefined") return cleaned;
+		} catch {
+			const filename = src.split("/").pop()?.split("?")[0] ?? "";
+			const decoded = decodeURIComponent(filename);
+			if (decoded && decoded !== "undefined") return decoded;
+		}
+	}
+	return `Video ${index + 1}`;
+};
+
 export const AiEdit = ({ projectId }: { projectId?: string }) => {
 	const { trackItemsMap } = useStore();
 	const {
@@ -88,8 +106,10 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 			(item) => item.type === "video",
 		);
 		setVideoItems(videos);
+		// Pre-select the first video by ID (not src) so clips with the same
+		// source file are treated as distinct items.
 		if (videos.length > 0 && !selectedVideo) {
-			setSelectedVideo(videos[0].details.src);
+			setSelectedVideo(videos[0].id);
 		}
 	}, [trackItemsMap, selectedVideo]);
 
@@ -122,14 +142,22 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 			return;
 		}
 
+		// Resolve the actual src URL from the selected item ID
+		const selectedItem = videoItems.find((v) => v.id === selectedVideo);
+		if (!selectedItem) {
+			toast.error("Selected video not found");
+			return;
+		}
+		const selectedSrc = (selectedItem.details as any).src as string;
+
 		setIsAnalyzing(true);
 		setAnalysisResult(null);
 
 		try {
 			const videoUrl =
-				selectedVideo.startsWith("/") && typeof window !== "undefined"
-					? `${window.location.origin}${selectedVideo}`
-					: selectedVideo;
+				selectedSrc.startsWith("/") && typeof window !== "undefined"
+					? `${window.location.origin}${selectedSrc}`
+					: selectedSrc;
 
 			const token = await getIdToken();
 			const response = await fetch("/api/analyze-video", {
@@ -154,9 +182,8 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 			if (data.analysis) {
 				setAnalysisResult(data.analysis);
 				if (projectId && data.analysis.segments?.length > 0) {
-					const videoName = videoItems.find(
-						(v) => v.details.src === selectedVideo,
-					)?.name;
+					// Look up name by ID for the history record
+					const videoName = videoItems.find((v) => v.id === selectedVideo)?.name;
 					try {
 						const token = await getIdToken();
 						const saveRes = await fetch("/api/analysis-history", {
@@ -285,8 +312,8 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 									</SelectTrigger>
 									<SelectContent className="z-[200]">
 										{videoItems.map((video, index) => (
-											<SelectItem key={video.id} value={video.details.src}>
-												{video.name || `Video ${index + 1}`}
+											<SelectItem key={video.id} value={video.id}>
+												{getVideoLabel(video, index)}
 											</SelectItem>
 										))}
 									</SelectContent>
