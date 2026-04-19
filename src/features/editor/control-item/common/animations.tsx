@@ -9,6 +9,7 @@ import useStore from "../../store/use-store";
 import { createPresetButtons } from "../floating-controls/animation-picker";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AnimationDuration } from "./animation-duration";
+import { presets } from "../../player/animated";
 interface PresetTextProps {
 	trackItem: ITrackItem & any;
 	properties: any;
@@ -49,6 +50,31 @@ const SelectaAnimation = ({ trackItem }: { trackItem: ITrackItem & IText }) => {
 		trackItem.type === "text" ? "text" : "media",
 		trackItemsMap,
 	);
+	const currentItem = activeIds[0] ? trackItemsMap[activeIds[0]] : null;
+	const animations = currentItem?.animations;
+	const activeNames: string[] = [];
+	if (animations?.in?.name)
+		activeNames.push(
+			presets[animations.in.name as keyof typeof presets]?.name ??
+				animations.in.name,
+		);
+	if (animations?.out?.name)
+		activeNames.push(
+			presets[animations.out.name as keyof typeof presets]?.name ??
+				animations.out.name,
+		);
+	if (animations?.loop?.name)
+		activeNames.push(
+			presets[animations.loop.name as keyof typeof presets]?.name ??
+				animations.loop.name,
+		);
+	const animationLabel =
+		activeNames.length === 0
+			? "None"
+			: activeNames.length === 1
+				? activeNames[0]
+				: "Multiple";
+
 	return (
 		<div className="flex gap-2 py-0 flex-col lg:flex-row">
 			<div className=" flex-1 items-center text-sm text-muted-foreground hidden lg:flex">
@@ -62,7 +88,7 @@ const SelectaAnimation = ({ trackItem }: { trackItem: ITrackItem & IText }) => {
 						onClick={() => setFloatingControl("animation-picker")}
 					>
 						<div className="w-full text-left">
-							<p className="truncate">None</p>
+							<p className="truncate">{animationLabel}</p>
 						</div>
 						<ChevronDown className="text-muted-foreground" size={14} />
 					</Button>

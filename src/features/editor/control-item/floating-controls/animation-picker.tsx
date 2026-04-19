@@ -24,39 +24,31 @@ export const createPresetButtons = (
 		.map((presetKey) => {
 			const preset = presets[presetKey as "scaleIn"];
 
-			const style = React.useMemo(
-				() => ({
-					backgroundImage: `url(${preset.previewUrl})`,
-					backgroundSize: "cover",
-					width: "60px",
-					height: "60px",
-					borderRadius: "8px",
-				}),
-				[preset.previewUrl],
-			);
+			// Plain object — useMemo cannot be called inside a .map() (Rules of Hooks)
+			const style = {
+				backgroundImage: `url(${preset.previewUrl})`,
+				backgroundSize: "cover",
+				width: "60px",
+				height: "60px",
+				borderRadius: "8px",
+			};
+
 			if (
 				animationType === "media" &&
 				preset.property?.toLowerCase().includes("text")
 			)
-				return;
-			let borderColor = "";
-			if (trackItemsMap) {
-				const currentItem = trackItemsMap[activeIds[0]];
-				const animations = currentItem?.animations;
+				return null;
 
-				const isSelected = ["in", "out", "loop"].some(
-					(type) => animations?.[type]?.name === presetKey,
-				);
-
-				if (isSelected) {
-					borderColor = "border-[#006239]";
-				}
-			}
+			// Check only this tab's slot (not all three), using the outer `type` parameter.
+			// The previous code used .some() over all types which shadowed the outer `type`
+			// and caused cross-tab highlights (e.g. "Fade In" lit up in the Out tab too).
+			const currentItem = trackItemsMap?.[activeIds[0]];
+			const animations = currentItem?.animations;
+			const isSelected = animations?.[type]?.name === presetKey;
 
 			return (
 				<div
 					key={presetKey}
-					className={`flex cursor-pointer flex-col gap-2 text-center text-xs text-muted-foreground items-center justify-center border ${borderColor}`}
 					onClick={() =>
 						applyAnimation(
 							presetKey as PresetName,
@@ -65,9 +57,15 @@ export const createPresetButtons = (
 							trackItemsMap,
 						)
 					}
+					className={[
+						"flex cursor-pointer flex-col gap-1.5 text-center text-xs items-center justify-center rounded-lg p-1.5 transition-all duration-150 border-2",
+						isSelected
+							? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
+							: "border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/40 hover:text-foreground",
+					].join(" ")}
 				>
 					<div style={style} draggable={false} />
-					<div>{preset.name}</div>
+					<div className="truncate w-full leading-snug">{preset.name}</div>
 				</div>
 			);
 		});
