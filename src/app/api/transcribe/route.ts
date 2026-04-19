@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 	if (!parsed.success) {
 		return NextResponse.json({ error: parsed.error }, { status: 400 });
 	}
-	const { url: mediaUrl, targetLanguage } = parsed.data;
+	const { url: mediaUrl, targetLanguage = "en" } = parsed.data;
 
 	// ── Resolve URL ─────────────────────────────────────────────────────────────
 	let absoluteMediaUrl = mediaUrl;
