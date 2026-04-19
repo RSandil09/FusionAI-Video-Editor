@@ -165,10 +165,13 @@ export const AiVoice = () => {
 	const fetchVoices = async (queryParams?: any) => {
 		setLoading(true);
 		try {
+			const token = await getIdToken();
+
 			const response = await fetch("/api/voices", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
 				body: JSON.stringify({
 					limit: 20,
@@ -180,11 +183,14 @@ export const AiVoice = () => {
 			if (response.ok) {
 				const data = await response.json();
 				setVoices(data.voices || []);
+			} else if (response.status === 401) {
+				toast.error("Session expired. Please refresh the page.");
 			} else {
-				console.error("Failed to fetch voices");
+				toast.error("Failed to load voices. Please try again.");
 			}
 		} catch (error) {
 			console.error("Error fetching voices:", error);
+			toast.error("Could not connect to voice service.");
 		} finally {
 			setLoading(false);
 		}
