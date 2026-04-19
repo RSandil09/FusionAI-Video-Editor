@@ -24,6 +24,7 @@ import { Voice, VoiceFilters } from "../interfaces/editor";
 import { ADD_AUDIO } from "@designcombo/state";
 import { dispatch } from "@designcombo/events";
 import { generateId } from "@designcombo/timeline";
+import { getIdToken } from "@/lib/auth/client";
 
 export const AiVoice = () => {
 	const [text, setText] = useState("");
@@ -210,16 +211,21 @@ export const AiVoice = () => {
 		setIsGenerating(true);
 
 		try {
-			// Call the TTS API
+			const token = await getIdToken();
+			if (!token) {
+				throw new Error("Not authenticated. Please log in to generate voice.");
+			}
+
 			const response = await fetch("/api/generate-voice", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
 				},
 				body: JSON.stringify({
 					text: text.trim(),
 					voiceId: selectedVoice.id,
-					folder: "ai-voice-generations", // Optional folder for organization
+					folder: "ai-voice-generations",
 				}),
 			});
 
@@ -230,19 +236,21 @@ export const AiVoice = () => {
 
 			const data = await response.json();
 
-			// Handle successful generation
-			// You can add logic here to handle the generated audio
-			// For example, add it to the timeline, play it, etc.
 			if (data.agent?.url) {
 				toast.success("Voice generated successfully!");
 
-				// Add the generated audio to the editor timeline
+				// Proxy through video-proxy so CORS headers are added and the
+				// @designcombo library can load the asset for duration probing.
+				const proxiedSrc = `/api/video-proxy?url=${encodeURIComponent(data.agent.url)}`;
+
+				// duration from API is in seconds; @designcombo expects milliseconds.
+				const durationMs = Math.round((data.agent.duration ?? 0) * 1000);
+
 				dispatch(ADD_AUDIO, {
 					payload: {
 						id: generateId(),
-						details: {
-							src: data.agent.url,
-						},
+						details: { src: proxiedSrc },
+						...(durationMs > 0 && { duration: durationMs }),
 						volume: 100,
 					},
 					options: {},

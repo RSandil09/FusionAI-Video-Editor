@@ -1,12 +1,53 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Mic, Square, Loader2, Play, Pause } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, MicOff, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { uploadFile } from "@/lib/upload-service";
 import { dispatch } from "@designcombo/events";
 import { ADD_AUDIO } from "@designcombo/state";
 import { generateId } from "@designcombo/timeline";
+
+/**
+ * Pick the best supported audio mimeType for MediaRecorder in the current browser.
+ * Safari supports mp4/aac; Firefox/Chrome support webm/opus.
+ */
+function getSupportedMimeType(): string {
+	const candidates = [
+		"audio/webm;codecs=opus",
+		"audio/webm",
+		"audio/ogg;codecs=opus",
+		"audio/ogg",
+		"audio/mp4",
+		"audio/mp4;codecs=mp4a.40.2",
+	];
+	for (const type of candidates) {
+		if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) {
+			return type;
+		}
+	}
+	return ""; // Let the browser choose its own default
+}
+
+/** Resolve the true duration of an audio Blob by loading it into an Audio element. */
+function getAudioDuration(blob: Blob): Promise<number> {
+	return new Promise((resolve) => {
+		const url = URL.createObjectURL(blob);
+		const audio = new Audio();
+		audio.preload = "metadata";
+		audio.onloadedmetadata = () => {
+			URL.revokeObjectURL(url);
+			resolve(isFinite(audio.duration) ? audio.duration : 0);
+		};
+		audio.onerror = () => {
+			URL.revokeObjectURL(url);
+			resolve(0);
+		};
+		audio.src = url;
+	});
+}
+
+type PermissionState = "unknown" | "checking" | "prompt" | "granted" | "denied" | "unavailable";
 
 export const VoiceRecorder = () => {
 	const [isRecording, setIsRecording] = useState(false);
@@ -14,12 +55,62 @@ export const VoiceRecorder = () => {
 	const [duration, setDuration] = useState(0);
 	const [audioUrl, setAudioUrl] = useState<string | null>(null);
 	const [isPlaying, setIsPlaying] = useState(false);
+	const [permState, setPermState] = useState<PermissionState>("checking");
 
 	const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 	const audioChunksRef = useRef<BlobPart[]>([]);
+	const audioBlobRef = useRef<Blob | null>(null);
 	const timerRef = useRef<NodeJS.Timeout | null>(null);
 	const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+	const permListenerRef = useRef<(() => void) | null>(null);
 
+	// ── Check initial permission state ──────────────────────────────────────────
+	useEffect(() => {
+		let cancelled = false;
+
+		async function check() {
+			// No mediaDevices API means non-secure context or old browser
+			if (
+				typeof navigator === "undefined" ||
+				!navigator.mediaDevices ||
+				typeof navigator.mediaDevices.getUserMedia !== "function"
+			) {
+				if (!cancelled) setPermState("unavailable");
+				return;
+			}
+
+			// Try the permissions API first (Chrome/Edge/Firefox — Safari partial)
+			if (navigator.permissions) {
+				try {
+					const status = await navigator.permissions.query({
+						name: "microphone" as PermissionName,
+					});
+					if (!cancelled) setPermState(status.state as PermissionState);
+
+					// Keep in sync if the user changes the permission while on the page
+					const onChange = () => {
+						if (!cancelled) setPermState(status.state as PermissionState);
+					};
+					status.addEventListener("change", onChange);
+					permListenerRef.current = () =>
+						status.removeEventListener("change", onChange);
+					return;
+				} catch {
+					// permissions API not available (Safari) — fall through to "unknown"
+				}
+			}
+
+			if (!cancelled) setPermState("unknown");
+		}
+
+		check();
+		return () => {
+			cancelled = true;
+			permListenerRef.current?.();
+		};
+	}, []);
+
+	// ── Cleanup on unmount ───────────────────────────────────────────────────────
 	useEffect(() => {
 		return () => {
 			stopRecordingContext();
@@ -41,45 +132,95 @@ export const VoiceRecorder = () => {
 	};
 
 	const startRecording = async () => {
-		try {
-			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-			const mediaRecorder = new MediaRecorder(stream, {
-				mimeType: "audio/webm",
-			});
-
-			audioChunksRef.current = [];
-
-			mediaRecorder.ondataavailable = (event) => {
-				if (event.data.size > 0) {
-					audioChunksRef.current.push(event.data);
-				}
-			};
-
-			mediaRecorder.onstop = () => {
-				const audioBlob = new Blob(audioChunksRef.current, {
-					type: "audio/webm",
-				});
-				const localUrl = URL.createObjectURL(audioBlob);
-				setAudioUrl(localUrl);
-				setIsRecording(false);
-			};
-
-			mediaRecorderRef.current = mediaRecorder;
-			mediaRecorder.start();
-
-			setIsRecording(true);
-			setDuration(0);
-			if (audioUrl) URL.revokeObjectURL(audioUrl);
-			setAudioUrl(null);
-			setIsPlaying(false);
-
-			timerRef.current = setInterval(() => {
-				setDuration((prev) => prev + 1);
-			}, 1000);
-		} catch (err) {
-			console.error("Error accessing microphone:", err);
-			toast.error("Microphone access denied or unavailable.");
+		// Guard: API unavailable
+		if (!navigator.mediaDevices?.getUserMedia) {
+			toast.error(
+				"Microphone recording is not available. Make sure the page is loaded over HTTPS.",
+			);
+			setPermState("unavailable");
+			return;
 		}
+
+		let stream: MediaStream;
+		try {
+			stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			// If we got a stream the permission is now granted
+			setPermState("granted");
+		} catch (err: any) {
+			const name = err?.name || "";
+			if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+				setPermState("denied");
+				toast.error(
+					"Microphone access was denied. Click the lock icon in your browser's address bar and allow microphone access, then try again.",
+				);
+			} else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+				toast.error(
+					"No microphone found. Please connect a microphone and try again.",
+				);
+			} else if (name === "NotReadableError" || name === "TrackStartError") {
+				toast.error(
+					"Microphone is already in use by another app. Close the other app and try again.",
+				);
+			} else {
+				toast.error(`Microphone error: ${err?.message || "Unknown error"}`);
+			}
+			return;
+		}
+
+		// Choose a MIME type the browser actually supports
+		const mimeType = getSupportedMimeType();
+
+		let mediaRecorder: MediaRecorder;
+		try {
+			mediaRecorder = new MediaRecorder(
+				stream,
+				mimeType ? { mimeType } : undefined,
+			);
+		} catch (err: any) {
+			// Codec not supported — let browser pick its own default
+			try {
+				mediaRecorder = new MediaRecorder(stream);
+			} catch (fallbackErr: any) {
+				stream.getTracks().forEach((t) => t.stop());
+				toast.error(
+					"Your browser does not support audio recording. Please try Chrome or Firefox.",
+				);
+				return;
+			}
+		}
+
+		audioChunksRef.current = [];
+
+		mediaRecorder.ondataavailable = (event) => {
+			if (event.data.size > 0) {
+				audioChunksRef.current.push(event.data);
+			}
+		};
+
+		mediaRecorder.onstop = () => {
+			const resolvedMime = mediaRecorder.mimeType || "audio/webm";
+			const audioBlob = new Blob(audioChunksRef.current, {
+				type: resolvedMime,
+			});
+			audioBlobRef.current = audioBlob;
+			const localUrl = URL.createObjectURL(audioBlob);
+			setAudioUrl(localUrl);
+			setIsRecording(false);
+		};
+
+		mediaRecorderRef.current = mediaRecorder;
+		mediaRecorder.start();
+
+		setIsRecording(true);
+		setDuration(0);
+		if (audioUrl) URL.revokeObjectURL(audioUrl);
+		setAudioUrl(null);
+		audioBlobRef.current = null;
+		setIsPlaying(false);
+
+		timerRef.current = setInterval(() => {
+			setDuration((prev) => prev + 1);
+		}, 1000);
 	};
 
 	const stopRecording = () => {
@@ -97,19 +238,22 @@ export const VoiceRecorder = () => {
 	};
 
 	const addToTimeline = async () => {
-		if (!audioUrl || audioChunksRef.current.length === 0) return;
+		const blob = audioBlobRef.current;
+		if (!audioUrl || !blob) return;
 
 		try {
 			setIsProcessing(true);
-			const audioBlob = new Blob(audioChunksRef.current, {
-				type: "audio/webm",
-			});
-			const file = new File([audioBlob], `VoiceOver_${Date.now()}.webm`, {
-				type: "audio/webm",
-			});
 
-			// Simulate a generic upload ID
-			const uploadId = `upload_${Date.now()}`;
+			// Resolve the actual audio duration before uploading
+			const durationSec = await getAudioDuration(blob);
+
+			// Derive a file extension from the MIME type
+			const mime = blob.type || "audio/webm";
+			const ext = mime.includes("mp4") ? "mp4" : mime.includes("ogg") ? "ogg" : "webm";
+
+			const file = new File([blob], `VoiceOver_${Date.now()}.${ext}`, {
+				type: mime,
+			});
 
 			const uploadResult = await uploadFile(file);
 
@@ -117,11 +261,14 @@ export const VoiceRecorder = () => {
 				throw new Error("Upload returned no URL.");
 			}
 
-			// Add to timeline
+			// Proxy through video-proxy so @designcombo can load it with CORS headers
+			const proxiedSrc = `/api/video-proxy?url=${encodeURIComponent(uploadResult.url)}`;
+
 			dispatch(ADD_AUDIO, {
 				payload: {
 					id: generateId(),
-					details: { src: uploadResult.url },
+					details: { src: proxiedSrc },
+					...(durationSec > 0 && { duration: Math.round(durationSec * 1000) }),
 					volume: 100,
 				},
 				options: {},
@@ -129,14 +276,63 @@ export const VoiceRecorder = () => {
 
 			toast.success("Voice recording added to timeline!");
 			setAudioUrl(null);
+			audioBlobRef.current = null;
 			setDuration(0);
 		} catch (err) {
 			console.error("Upload error:", err);
-			toast.error("Failed to upload recording.");
+			toast.error(
+				err instanceof Error ? err.message : "Failed to upload recording.",
+			);
 		} finally {
 			setIsProcessing(false);
 		}
 	};
+
+	// ── Blocked / unavailable states ─────────────────────────────────────────────
+	if (permState === "unavailable") {
+		return (
+			<div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+				<div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+					<MicOff className="w-6 h-6 text-muted-foreground" />
+				</div>
+				<div>
+					<p className="text-sm font-semibold">Recording not available</p>
+					<p className="text-xs text-muted-foreground mt-1 max-w-[220px]">
+						Microphone access requires a secure (HTTPS) connection. Make sure
+						you're on the production URL, not an HTTP preview.
+					</p>
+				</div>
+			</div>
+		);
+	}
+
+	if (permState === "denied") {
+		return (
+			<div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+				<div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+					<ShieldAlert className="w-6 h-6 text-destructive" />
+				</div>
+				<div>
+					<p className="text-sm font-semibold">Microphone blocked</p>
+					<p className="text-xs text-muted-foreground mt-1 max-w-[240px]">
+						Click the lock icon in your browser's address bar, set Microphone to
+						"Allow", then reload the page.
+					</p>
+				</div>
+				<Button
+					size="sm"
+					variant="outline"
+					onClick={() => {
+						// Re-attempt: will either prompt or fail with NotAllowedError
+						setPermState("unknown");
+						startRecording();
+					}}
+				>
+					Try again
+				</Button>
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex h-full flex-col">
