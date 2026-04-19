@@ -101,13 +101,14 @@ export async function getPresignedUploadUrl(
 	if (!bucketName) throw new Error("R2_BUCKET_NAME must be set");
 
 	const client = getR2Client();
+	// Do NOT include CacheControl here — it becomes a signed required header in the
+	// presigned URL, which means the browser PUT must send Cache-Control. R2's default
+	// CORS policy doesn't allow that header in cross-origin PUTs → preflight blocked
+	// → "Network error during upload". Cache headers are set server-side in uploadToR2.
 	const command = new PutObjectCommand({
 		Bucket: bucketName,
 		Key: key,
 		ContentType: contentType,
-		// Stored as object metadata so Cloudflare CDN caches the object at the edge
-		// after first access. Without this, every request hits R2 origin.
-		CacheControl: "public, max-age=31536000, immutable",
 	});
 
 	const url = await getSignedUrl(client, command, { expiresIn });
