@@ -1,29 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-	Loader2,
-	Wand2,
-	Scissors,
-	VolumeX,
-	Sparkles,
-	Play,
-	Check,
-	Film,
-	ChevronDown,
-	ChevronUp,
-	X,
-	History,
-	Trash2,
-} from "lucide-react";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { getIdToken } from "@/lib/auth/client";
@@ -36,27 +13,84 @@ import {
 	type AnalysisResult,
 	type AnalysisSegment,
 } from "../store/use-smart-edit-store";
+import {
+	Loader2,
+	Wand2,
+	Scissors,
+	VolumeX,
+	Sparkles,
+	Play,
+	Film,
+	X,
+	History,
+	Trash2,
+	ChevronDown,
+	ChevronRight,
+	Clock,
+	Zap,
+} from "lucide-react";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+
+// ── Analysis type definitions ────────────────────────────────────────────────
 
 const ANALYSIS_TYPES = [
 	{
 		value: "scenes",
 		label: "Scene Detection",
-		description: "Detect cuts and scene changes",
+		description: "Detect cuts & scene transitions",
 		icon: Scissors,
+		gradient: "from-blue-500/20 to-indigo-600/10",
+		border: "border-blue-500/25",
+		activeBorder: "border-blue-400/60",
+		activeGlow: "shadow-blue-500/20",
+		iconColor: "text-blue-400",
+		iconBg: "bg-blue-500/15",
+		badgeColor: "bg-blue-500/15 text-blue-300 border-blue-500/20",
+		segmentColor: "bg-blue-500",
+		segmentBg: "bg-blue-500/10",
+		segmentBorder: "border-blue-500/20",
 	},
 	{
 		value: "silences",
 		label: "Silence Detection",
 		description: "Find silent segments to remove",
 		icon: VolumeX,
+		gradient: "from-amber-500/20 to-orange-600/10",
+		border: "border-amber-500/25",
+		activeBorder: "border-amber-400/60",
+		activeGlow: "shadow-amber-500/20",
+		iconColor: "text-amber-400",
+		iconBg: "bg-amber-500/15",
+		badgeColor: "bg-amber-500/15 text-amber-300 border-amber-500/20",
+		segmentColor: "bg-amber-500",
+		segmentBg: "bg-amber-500/10",
+		segmentBorder: "border-amber-500/20",
 	},
 	{
 		value: "highlights",
 		label: "Auto Highlights",
 		description: "AI picks the best moments",
 		icon: Sparkles,
+		gradient: "from-violet-500/20 to-purple-600/10",
+		border: "border-violet-500/25",
+		activeBorder: "border-violet-400/60",
+		activeGlow: "shadow-violet-500/20",
+		iconColor: "text-violet-400",
+		iconBg: "bg-violet-500/15",
+		badgeColor: "bg-violet-500/15 text-violet-300 border-violet-500/20",
+		segmentColor: "bg-violet-500",
+		segmentBg: "bg-violet-500/10",
+		segmentBorder: "border-violet-500/20",
 	},
-];
+] as const;
+
+type AnalysisTypeValue = (typeof ANALYSIS_TYPES)[number]["value"];
 
 interface HistoryItem {
 	id: string;
@@ -67,7 +101,8 @@ interface HistoryItem {
 	created_at: string;
 }
 
-/** Extract a human-readable filename from a video track item's src URL. */
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 const getVideoLabel = (item: ITrackItem, index: number): string => {
 	const src = (item.details as any)?.src as string | undefined;
 	if (src) {
@@ -85,6 +120,28 @@ const getVideoLabel = (item: ITrackItem, index: number): string => {
 	return `Video ${index + 1}`;
 };
 
+const formatTime = (seconds: number): string => {
+	const mins = Math.floor(seconds / 60);
+	const secs = Math.floor(seconds % 60);
+	const ms = Math.floor((seconds % 1) * 100);
+	return `${mins}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
+};
+
+const formatHistoryDate = (iso: string) => {
+	const d = new Date(iso);
+	const now = new Date();
+	const diff = now.getTime() - d.getTime();
+	if (diff < 60000) return "Just now";
+	if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+	if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+	return d.toLocaleDateString();
+};
+
+const getTypeConfig = (value: string) =>
+	ANALYSIS_TYPES.find((t) => t.value === value) ?? ANALYSIS_TYPES[0];
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
 export const AiEdit = ({ projectId }: { projectId?: string }) => {
 	const { trackItemsMap } = useStore();
 	const {
@@ -94,20 +151,20 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 		setResultsExpanded,
 		clearResults,
 	} = useSmartEditStore();
+
 	const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
-	const [analysisType, setAnalysisType] = useState<string>("scenes");
+	const [analysisType, setAnalysisType] = useState<AnalysisTypeValue>("scenes");
 	const [isAnalyzing, setIsAnalyzing] = useState(false);
 	const [videoItems, setVideoItems] = useState<ITrackItem[]>([]);
 	const [history, setHistory] = useState<HistoryItem[]>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
+	const [historyOpen, setHistoryOpen] = useState(false);
 
 	useEffect(() => {
 		const videos = Object.values(trackItemsMap).filter(
 			(item) => item.type === "video",
 		);
 		setVideoItems(videos);
-		// Pre-select the first video by ID (not src) so clips with the same
-		// source file are treated as distinct items.
 		if (videos.length > 0 && !selectedVideo) {
 			setSelectedVideo(videos[0].id);
 		}
@@ -141,8 +198,6 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 			toast.error("Please select a video to analyze");
 			return;
 		}
-
-		// Resolve the actual src URL from the selected item ID
 		const selectedItem = videoItems.find((v) => v.id === selectedVideo);
 		if (!selectedItem) {
 			toast.error("Selected video not found");
@@ -166,10 +221,7 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 					"Content-Type": "application/json",
 					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
-				body: JSON.stringify({
-					videoUrl,
-					analysisType,
-				}),
+				body: JSON.stringify({ videoUrl, analysisType }),
 			});
 
 			if (!response.ok) {
@@ -182,15 +234,16 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 			if (data.analysis) {
 				setAnalysisResult(data.analysis);
 				if (projectId && data.analysis.segments?.length > 0) {
-					// Look up name by ID for the history record
-					const videoName = videoItems.find((v) => v.id === selectedVideo)?.name;
+					const videoName = videoItems.find(
+						(v) => v.id === selectedVideo,
+					)?.name;
 					try {
-						const token = await getIdToken();
+						const token2 = await getIdToken();
 						const saveRes = await fetch("/api/analysis-history", {
 							method: "POST",
 							headers: {
 								"Content-Type": "application/json",
-								...(token ? { Authorization: `Bearer ${token}` } : {}),
+								...(token2 ? { Authorization: `Bearer ${token2}` } : {}),
 							},
 							body: JSON.stringify({
 								projectId,
@@ -232,18 +285,6 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 		dispatch(PLAYER_SEEK, { payload: { time: startTime * 1000 } });
 	};
 
-	const formatTime = (seconds: number): string => {
-		const mins = Math.floor(seconds / 60);
-		const secs = Math.floor(seconds % 60);
-		const ms = Math.floor((seconds % 1) * 100);
-		return `${mins}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
-	};
-
-	const getAnalysisIcon = () => {
-		const type = ANALYSIS_TYPES.find((t) => t.value === analysisType);
-		return type?.icon || Wand2;
-	};
-
 	const handleSelectHistory = (item: HistoryItem) => {
 		setAnalysisResult({
 			type: item.analysis_type,
@@ -260,59 +301,80 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 				method: "DELETE",
 				headers: token ? { Authorization: `Bearer ${token}` } : {},
 			});
-			if (res.ok) {
-				setHistory((prev) => prev.filter((h) => h.id !== id));
-			}
-		} catch (err) {
+			if (res.ok) setHistory((prev) => prev.filter((h) => h.id !== id));
+		} catch {
 			toast.error("Failed to delete");
 		}
 	};
 
-	const formatHistoryDate = (iso: string) => {
-		const d = new Date(iso);
-		const now = new Date();
-		const diff = now.getTime() - d.getTime();
-		if (diff < 60000) return "Just now";
-		if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-		if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-		return d.toLocaleDateString();
-	};
+	const activeType = getTypeConfig(analysisType);
+	const ActiveIcon = activeType.icon;
 
-	const AnalysisIcon = getAnalysisIcon();
-
+	// ── Render ─────────────────────────────────────────────────────────────────
 	return (
-		<div className="flex flex-1 flex-col max-w-full min-h-0">
-			<div className="text-text-primary flex h-12 flex-none items-center px-4 text-sm font-medium gap-2 shrink-0">
-				<Wand2 className="w-4 h-4" />
-				Smart Editing
+		<div className="flex flex-col h-full overflow-hidden bg-gradient-to-b from-background to-muted/20">
+			{/* ── Header ──────────────────────────────────────────────────────── */}
+			<div className="flex-none px-5 py-4 border-b border-border/30 bg-background/80 backdrop-blur-sm">
+				<div className="flex items-center gap-3">
+					<div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/25 to-purple-600/15 border border-violet-500/25 shadow-sm">
+						<Wand2 className="w-4 h-4 text-violet-400" />
+					</div>
+					<div>
+						<h2 className="text-[15px] font-semibold text-foreground tracking-tight">
+							Smart Edit
+						</h2>
+						<p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+							AI-powered video analysis
+						</p>
+					</div>
+				</div>
 			</div>
 
-			<div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-				{/* Setup Section - Compact to maximize room for results */}
-				<div className="flex-none space-y-2.5 px-3 pt-3 pb-2 border-b border-border/40 shrink-0">
+			<ScrollArea className="flex-1 min-h-0">
+				<div className="flex flex-col gap-5 px-4 py-4 pb-8">
+					{/* ── Empty state ─────────────────────────────────────────── */}
 					{videoItems.length === 0 ? (
-						<div className="text-center py-6 text-muted-foreground">
-							<Wand2 className="w-10 h-10 mx-auto mb-2 opacity-50" />
-							<p className="text-sm font-medium">No videos in timeline</p>
-							<p className="text-xs mt-1">Add a video to use smart editing</p>
+						<div className="flex flex-col items-center justify-center py-14 gap-4 text-center">
+							<div className="relative">
+								<div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-600/10 border border-violet-500/20 flex items-center justify-center shadow-lg shadow-violet-500/10">
+									<Film className="w-7 h-7 text-violet-400/70" />
+								</div>
+								<div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-muted border border-border flex items-center justify-center">
+									<Wand2 className="w-3 h-3 text-muted-foreground" />
+								</div>
+							</div>
+							<div>
+								<p className="text-sm font-semibold text-foreground">
+									No videos in timeline
+								</p>
+								<p className="text-xs text-muted-foreground mt-1.5 max-w-[200px] leading-relaxed">
+									Add a video clip to the timeline to start AI analysis
+								</p>
+							</div>
 						</div>
 					) : (
 						<>
+							{/* ── Video selector ──────────────────────────────── */}
 							<div className="space-y-2">
-								<Label className="font-sans text-xs font-semibold">
-									Select Video
-								</Label>
+								<label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+									<Film className="w-3 h-3 text-muted-foreground" />
+									Video clip
+								</label>
 								<Select
 									value={selectedVideo || undefined}
 									onValueChange={setSelectedVideo}
 									disabled={isAnalyzing}
 								>
-									<SelectTrigger className="rounded-xl">
-										<SelectValue placeholder="Select a video" />
+									<SelectTrigger className="rounded-xl h-10 bg-muted/30 border-border/40 text-sm focus:ring-1 focus:ring-ring/30">
+										<SelectValue placeholder="Select a video clip…" />
 									</SelectTrigger>
-									<SelectContent className="z-[200]">
+									<SelectContent className="z-[200] rounded-xl">
 										{videoItems.map((video, index) => (
-											<SelectItem key={video.id} value={video.id}>
+											<SelectItem
+												key={video.id}
+												value={video.id}
+												className="rounded-lg"
+											>
 												{getVideoLabel(video, index)}
 											</SelectItem>
 										))}
@@ -320,280 +382,437 @@ export const AiEdit = ({ projectId }: { projectId?: string }) => {
 								</Select>
 							</div>
 
+							{/* ── Analysis type cards ──────────────────────────── */}
 							<div className="space-y-2">
-								<Label className="font-sans text-xs font-semibold">
-									Analysis Type
-								</Label>
-								<div className="grid grid-cols-1 gap-1.5">
+								<label className="text-xs font-semibold text-foreground/80 uppercase tracking-wider flex items-center gap-1.5">
+									<Zap className="w-3 h-3 text-muted-foreground" />
+									Analysis mode
+								</label>
+								<div className="grid grid-cols-1 gap-2">
 									{ANALYSIS_TYPES.map((type) => {
 										const Icon = type.icon;
 										const isSelected = analysisType === type.value;
 										return (
-											<Card
+											<button
 												key={type.value}
-												className={`p-2 cursor-pointer transition-all rounded-xl ${
+												type="button"
+												disabled={isAnalyzing}
+												onClick={() => setAnalysisType(type.value)}
+												className={[
+													"relative w-full text-left rounded-xl border p-3.5 transition-all duration-200 group overflow-hidden",
 													isSelected
-														? "ring-2 ring-primary bg-primary/5"
-														: "hover:bg-muted/50"
-												}`}
-												onClick={() =>
-													!isAnalyzing && setAnalysisType(type.value)
-												}
+														? `bg-gradient-to-r ${type.gradient} ${type.activeBorder} shadow-lg ${type.activeGlow}`
+														: `bg-muted/20 ${type.border} hover:bg-muted/40 hover:border-border/60`,
+													isAnalyzing ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+												].join(" ")}
 											>
-												<div className="flex items-center gap-2">
+												{/* Subtle background glow on selected */}
+												{isSelected && (
+													<div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none" />
+												)}
+												<div className="flex items-center gap-3">
 													<div
-														className={`p-1 rounded-lg ${
-															isSelected ? "bg-primary/20" : "bg-muted"
-														}`}
+														className={[
+															"flex h-9 w-9 items-center justify-center rounded-lg flex-none transition-all duration-200",
+															isSelected ? type.iconBg : "bg-muted/60 group-hover:bg-muted",
+														].join(" ")}
 													>
 														<Icon
-															className={`w-3 h-3 ${
-																isSelected
-																	? "text-primary"
-																	: "text-muted-foreground"
-															}`}
+															className={[
+																"w-4 h-4 transition-colors duration-200",
+																isSelected ? type.iconColor : "text-muted-foreground group-hover:text-foreground/70",
+															].join(" ")}
 														/>
 													</div>
 													<div className="flex-1 min-w-0">
-														<p className="text-xs font-medium">{type.label}</p>
-														<p className="text-[11px] text-muted-foreground truncate">
+														<p
+															className={[
+																"text-sm font-semibold leading-tight transition-colors",
+																isSelected ? "text-foreground" : "text-foreground/80",
+															].join(" ")}
+														>
+															{type.label}
+														</p>
+														<p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
 															{type.description}
 														</p>
 													</div>
-													{isSelected && (
-														<Check className="w-3.5 h-3.5 text-primary shrink-0" />
-													)}
+													{/* Selection indicator */}
+													<div
+														className={[
+															"w-2 h-2 rounded-full flex-none transition-all duration-200",
+															isSelected ? `${type.segmentColor} shadow-sm` : "bg-border",
+														].join(" ")}
+													/>
 												</div>
-											</Card>
+											</button>
 										);
 									})}
 								</div>
 							</div>
 
+							{/* ── Analyze button ───────────────────────────────── */}
 							<Button
 								onClick={handleAnalyze}
 								disabled={!selectedVideo || isAnalyzing}
-								className="w-full rounded-xl"
+								className={[
+									"w-full h-11 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm",
+									!isAnalyzing
+										? "bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-violet-500/25 hover:shadow-violet-500/40 hover:shadow-md"
+										: "",
+								].join(" ")}
 							>
 								{isAnalyzing ? (
-									<>
-										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-										Analyzing...
-									</>
+									<span className="flex items-center gap-2">
+										<Loader2 className="h-4 w-4 animate-spin" />
+										Analyzing video…
+									</span>
 								) : (
-									<>
-										<AnalysisIcon className="mr-2 h-4 w-4" />
-										Analyze Video
-									</>
+									<span className="flex items-center gap-2">
+										<ActiveIcon className="h-4 w-4" />
+										Analyze with {activeType.label}
+									</span>
 								)}
 							</Button>
 
-							{/* Analysis History - when projectId exists */}
+							{/* ── Results panel ────────────────────────────────── */}
+							{analysisResult && (
+								<ResultsPanel
+									analysisResult={analysisResult}
+									resultsExpanded={resultsExpanded}
+									setResultsExpanded={setResultsExpanded}
+									clearResults={clearResults}
+									onSeek={handleSeekToSegment}
+									formatTime={formatTime}
+								/>
+							)}
+
+							{/* ── History section ──────────────────────────────── */}
 							{projectId && (
-								<div className="space-y-2">
-									<Label className="font-sans text-xs font-semibold flex items-center gap-1.5">
-										<History className="w-3 h-3" />
-										Analysis History
-									</Label>
-									{historyLoading ? (
-										<div className="flex items-center justify-center py-4">
-											<Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-										</div>
-									) : history.length === 0 ? (
-										<p className="text-[11px] text-muted-foreground py-2">
-											No past analyses. Run one to save it here.
-										</p>
-									) : (
-										<div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto">
-											{history.map((item) => {
-												const TypeIcon =
-													ANALYSIS_TYPES.find(
-														(t) => t.value === item.analysis_type,
-													)?.icon || Wand2;
-												const isActive =
-													analysisResult?.type === item.analysis_type &&
-													analysisResult?.segments?.length ===
-														item.segments?.length;
-												return (
-													<Card
-														key={item.id}
-														className={`p-2 cursor-pointer transition-all rounded-lg flex items-center gap-2 ${
-															isActive
-																? "ring-2 ring-primary bg-primary/5"
-																: "hover:bg-muted/50"
-														}`}
-														onClick={() => handleSelectHistory(item)}
-													>
-														<TypeIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-														<div className="flex-1 min-w-0">
-															<p className="text-[11px] font-medium truncate">
-																{ANALYSIS_TYPES.find(
-																	(t) => t.value === item.analysis_type,
-																)?.label || item.analysis_type}
-															</p>
-															<p className="text-[10px] text-muted-foreground">
-																{item.segments?.length || 0} segments ·{" "}
-																{formatHistoryDate(item.created_at)}
-															</p>
-														</div>
-														<Button
-															variant="ghost"
-															size="icon"
-															className="h-6 w-6 shrink-0 rounded"
-															onClick={(e) => handleDeleteHistory(e, item.id)}
-															title="Delete from history"
-														>
-															<Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-														</Button>
-													</Card>
-												);
-											})}
-										</div>
-									)}
-								</div>
+								<HistorySection
+									history={history}
+									historyLoading={historyLoading}
+									historyOpen={historyOpen}
+									setHistoryOpen={setHistoryOpen}
+									analysisResult={analysisResult}
+									onSelectHistory={handleSelectHistory}
+									onDeleteHistory={handleDeleteHistory}
+									formatHistoryDate={formatHistoryDate}
+								/>
 							)}
 						</>
 					)}
 				</div>
-
-				{/* Persistent Results - Inline, scrollable, no overlay */}
-				{analysisResult && (
-					<div className="flex-1 min-h-[300px] flex flex-col border-t border-border/40 overflow-hidden">
-						<button
-							type="button"
-							onClick={() => setResultsExpanded(!resultsExpanded)}
-							className="flex-none flex items-center justify-between gap-2 px-4 py-2 hover:bg-muted/30 transition-colors border-b border-border/30 shrink-0"
-						>
-							<div className="flex items-center gap-2">
-								<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-									{(() => {
-										const TypeIcon =
-											ANALYSIS_TYPES.find(
-												(t) => t.value === analysisResult.type,
-											)?.icon || Wand2;
-										return <TypeIcon className="h-4 w-4 text-primary" />;
-									})()}
-								</div>
-								<div className="text-left">
-									<p className="text-sm font-semibold">
-										{
-											ANALYSIS_TYPES.find(
-												(t) => t.value === analysisResult.type,
-											)?.label
-										}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										{analysisResult.segments.length} segment
-										{analysisResult.segments.length !== 1 ? "s" : ""} · Click to
-										seek
-									</p>
-								</div>
-							</div>
-							<div className="flex items-center gap-1">
-								<Badge variant="secondary" className="text-xs">
-									{analysisResult.segments.length}
-								</Badge>
-								<Button
-									variant="ghost"
-									size="icon"
-									className="h-7 w-7 rounded-lg"
-									onClick={(e) => {
-										e.stopPropagation();
-										clearResults();
-									}}
-									title="Clear results"
-								>
-									<X className="h-3.5 w-3.5" />
-								</Button>
-								{resultsExpanded ? (
-									<ChevronDown className="h-4 w-4 text-muted-foreground" />
-								) : (
-									<ChevronUp className="h-4 w-4 text-muted-foreground" />
-								)}
-							</div>
-						</button>
-
-						{resultsExpanded && (
-							<>
-								{analysisResult.segments.length > 0 ? (
-									<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain">
-										<div className="flex flex-col gap-3 p-4 pb-6">
-											{analysisResult.segments.map((segment, index) => (
-												<SegmentCard
-													key={index}
-													segment={segment}
-													formatTime={formatTime}
-													onSeek={handleSeekToSegment}
-												/>
-											))}
-										</div>
-									</div>
-								) : (
-									<div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 px-4">
-										<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
-											<Film className="h-6 w-6 text-muted-foreground" />
-										</div>
-										<p className="text-xs font-medium text-center">
-											No {analysisResult.type} detected
-										</p>
-										<p className="text-[11px] text-muted-foreground text-center">
-											Try a different analysis type
-										</p>
-									</div>
-								)}
-							</>
-						)}
-					</div>
-				)}
-			</div>
+			</ScrollArea>
 		</div>
 	);
 };
 
-const SegmentCard = ({
+// ── Results Panel ─────────────────────────────────────────────────────────────
+
+const ResultsPanel = ({
+	analysisResult,
+	resultsExpanded,
+	setResultsExpanded,
+	clearResults,
+	onSeek,
+	formatTime,
+}: {
+	analysisResult: AnalysisResult;
+	resultsExpanded: boolean;
+	setResultsExpanded: (v: boolean) => void;
+	clearResults: () => void;
+	onSeek: (s: number) => void;
+	formatTime: (s: number) => string;
+}) => {
+	const config = getTypeConfig(analysisResult.type);
+	const Icon = config.icon;
+	const count = analysisResult.segments.length;
+
+	return (
+		<div
+			className={[
+				"rounded-2xl border overflow-hidden transition-all duration-200",
+				config.segmentBorder,
+				config.segmentBg,
+			].join(" ")}
+		>
+			{/* Results header */}
+			<button
+				type="button"
+				onClick={() => setResultsExpanded(!resultsExpanded)}
+				className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors"
+			>
+				<div
+					className={[
+						"flex h-8 w-8 items-center justify-center rounded-lg flex-none",
+						config.iconBg,
+					].join(" ")}
+				>
+					<Icon className={["w-3.5 h-3.5", config.iconColor].join(" ")} />
+				</div>
+				<div className="flex-1 text-left min-w-0">
+					<p className="text-sm font-semibold text-foreground leading-tight">
+						{config.label}
+					</p>
+					<p className="text-[11px] text-muted-foreground mt-0.5">
+						{count > 0
+							? `${count} segment${count !== 1 ? "s" : ""} found · click to seek`
+							: "No segments detected"}
+					</p>
+				</div>
+				<div className="flex items-center gap-2 flex-none">
+					<span
+						className={[
+							"text-xs font-semibold px-2 py-0.5 rounded-full border",
+							config.badgeColor,
+						].join(" ")}
+					>
+						{count}
+					</span>
+					<button
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation();
+							clearResults();
+						}}
+						className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+						title="Clear results"
+					>
+						<X className="w-3.5 h-3.5" />
+					</button>
+					{resultsExpanded ? (
+						<ChevronDown className="w-4 h-4 text-muted-foreground" />
+					) : (
+						<ChevronRight className="w-4 h-4 text-muted-foreground" />
+					)}
+				</div>
+			</button>
+
+			{/* Segment list */}
+			{resultsExpanded && (
+				<div className="border-t border-border/30">
+					{count === 0 ? (
+						<div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
+							<Film className="w-8 h-8 text-muted-foreground/40" />
+							<p className="text-xs text-muted-foreground">
+								No {analysisResult.type} detected in this video
+							</p>
+							<p className="text-[11px] text-muted-foreground/60">
+								Try a different analysis mode
+							</p>
+						</div>
+					) : (
+						<div className="flex flex-col divide-y divide-border/20">
+							{analysisResult.segments.map((segment, index) => (
+								<SegmentRow
+									key={index}
+									index={index}
+									segment={segment}
+									config={config}
+									formatTime={formatTime}
+									onSeek={onSeek}
+								/>
+							))}
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
+};
+
+// ── Segment Row ───────────────────────────────────────────────────────────────
+
+const SegmentRow = ({
+	index,
 	segment,
+	config,
 	formatTime,
 	onSeek,
 }: {
+	index: number;
 	segment: AnalysisSegment;
+	config: (typeof ANALYSIS_TYPES)[number];
 	formatTime: (s: number) => string;
 	onSeek: (s: number) => void;
-}) => (
-	<Card
-		className="p-3.5 cursor-pointer hover:bg-muted/50 hover:border-primary/30 transition-all border-border/40 rounded-xl group shrink-0"
-		onClick={() => onSeek(segment.start)}
-	>
-		<div className="flex items-start gap-3">
-			<button
-				type="button"
-				className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/80 group-hover:bg-primary/20 transition-colors"
-				onClick={(e) => {
-					e.stopPropagation();
-					onSeek(segment.start);
-				}}
+}) => {
+	const duration = segment.end - segment.start;
+
+	return (
+		<button
+			type="button"
+			onClick={() => onSeek(segment.start)}
+			className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors group"
+		>
+			{/* Index + play indicator */}
+			<div
+				className={[
+					"flex h-7 w-7 items-center justify-center rounded-lg flex-none text-[11px] font-bold transition-all duration-150",
+					"bg-muted/60 text-muted-foreground",
+					"group-hover:bg-primary/20 group-hover:text-primary",
+				].join(" ")}
 			>
-				<Play className="h-3 w-3 text-muted-foreground group-hover:text-primary ml-0.5" />
-			</button>
-			<div className="flex-1 min-w-0">
-				<div className="flex flex-wrap items-center gap-2 mb-1">
-					<span className="text-xs font-mono text-muted-foreground">
-						{formatTime(segment.start)} → {formatTime(segment.end)}
+				<span className="group-hover:hidden">{index + 1}</span>
+				<Play className="w-3 h-3 hidden group-hover:block ml-0.5" />
+			</div>
+
+			{/* Segment info */}
+			<div className="flex-1 min-w-0 space-y-1">
+				<div className="flex items-center gap-2 flex-wrap">
+					<span className="text-[11px] font-mono text-muted-foreground">
+						{formatTime(segment.start)}
+					</span>
+					<span className="text-[10px] text-muted-foreground/50">→</span>
+					<span className="text-[11px] font-mono text-muted-foreground">
+						{formatTime(segment.end)}
+					</span>
+					<span
+						className={[
+							"text-[10px] font-medium px-1.5 py-0.5 rounded-md border",
+							config.badgeColor,
+						].join(" ")}
+					>
+						{duration.toFixed(1)}s
 					</span>
 					{segment.confidence !== undefined && (
-						<Badge variant="outline" className="text-[10px] px-1.5 py-0">
+						<span className="text-[10px] text-muted-foreground/70">
 							{Math.round(segment.confidence * 100)}%
-						</Badge>
+						</span>
 					)}
-					<span className="text-[11px] text-muted-foreground">
-						{(segment.end - segment.start).toFixed(1)}s
-					</span>
 				</div>
+
+				{/* Duration bar */}
+				<div className="h-1 w-full rounded-full bg-muted/50 overflow-hidden">
+					<div
+						className={["h-full rounded-full opacity-60", config.segmentColor].join(" ")}
+						style={{
+							width: `${Math.min(100, Math.max(4, (duration / 30) * 100))}%`,
+						}}
+					/>
+				</div>
+
 				{segment.label && (
-					<p className="text-xs text-foreground leading-relaxed line-clamp-2">
+					<p className="text-[11px] text-foreground/70 leading-snug line-clamp-1">
 						{segment.label}
 					</p>
 				)}
 			</div>
-		</div>
-	</Card>
+		</button>
+	);
+};
+
+// ── History Section ───────────────────────────────────────────────────────────
+
+const HistorySection = ({
+	history,
+	historyLoading,
+	historyOpen,
+	setHistoryOpen,
+	analysisResult,
+	onSelectHistory,
+	onDeleteHistory,
+	formatHistoryDate,
+}: {
+	history: HistoryItem[];
+	historyLoading: boolean;
+	historyOpen: boolean;
+	setHistoryOpen: (v: boolean) => void;
+	analysisResult: AnalysisResult | null;
+	onSelectHistory: (item: HistoryItem) => void;
+	onDeleteHistory: (e: React.MouseEvent, id: string) => void;
+	formatHistoryDate: (iso: string) => string;
+}) => (
+	<div className="rounded-xl border border-border/30 bg-muted/10 overflow-hidden">
+		<button
+			type="button"
+			onClick={() => setHistoryOpen(!historyOpen)}
+			className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-muted/30 transition-colors"
+		>
+			<History className="w-3.5 h-3.5 text-muted-foreground flex-none" />
+			<span className="flex-1 text-left text-xs font-semibold text-foreground/80">
+				Analysis History
+			</span>
+			{history.length > 0 && (
+				<span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md font-medium">
+					{history.length}
+				</span>
+			)}
+			{historyOpen ? (
+				<ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+			) : (
+				<ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+			)}
+		</button>
+
+		{historyOpen && (
+			<div className="border-t border-border/20">
+				{historyLoading ? (
+					<div className="flex items-center justify-center py-6">
+						<Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+					</div>
+				) : history.length === 0 ? (
+					<div className="flex flex-col items-center gap-2 py-6 text-center">
+						<Clock className="w-6 h-6 text-muted-foreground/40" />
+						<p className="text-xs text-muted-foreground">No past analyses yet</p>
+					</div>
+				) : (
+					<div className="flex flex-col divide-y divide-border/20 max-h-52 overflow-y-auto overscroll-contain">
+						{history.map((item) => {
+							const typeConfig = getTypeConfig(item.analysis_type);
+							const TypeIcon = typeConfig.icon;
+							const isActive =
+								analysisResult?.type === item.analysis_type &&
+								analysisResult?.segments?.length === item.segments?.length;
+
+							return (
+								<button
+									key={item.id}
+									type="button"
+									onClick={() => onSelectHistory(item)}
+									className={[
+										"w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors group",
+										isActive
+											? "bg-primary/10"
+											: "hover:bg-muted/30",
+									].join(" ")}
+								>
+									<div
+										className={[
+											"flex h-6 w-6 items-center justify-center rounded-md flex-none",
+											typeConfig.iconBg,
+										].join(" ")}
+									>
+										<TypeIcon
+											className={["w-3 h-3", typeConfig.iconColor].join(" ")}
+										/>
+									</div>
+									<div className="flex-1 min-w-0">
+										<p className="text-[11px] font-medium text-foreground/90 truncate">
+											{typeConfig.label}
+										</p>
+										<p className="text-[10px] text-muted-foreground">
+											{item.segments?.length ?? 0} segments ·{" "}
+											{formatHistoryDate(item.created_at)}
+										</p>
+									</div>
+									{isActive && (
+										<div className="w-1.5 h-1.5 rounded-full bg-primary flex-none" />
+									)}
+									<button
+										type="button"
+										onClick={(e) => onDeleteHistory(e, item.id)}
+										className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all"
+										title="Delete"
+									>
+										<Trash2 className="w-3 h-3" />
+									</button>
+								</button>
+							);
+						})}
+					</div>
+				)}
+			</div>
+		)}
+	</div>
 );
