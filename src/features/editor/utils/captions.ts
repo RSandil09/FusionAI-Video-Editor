@@ -2,40 +2,86 @@ import { generateId } from "@designcombo/timeline";
 import { ICaption } from "@designcombo/types";
 import { CAPTION_DEFAULTS } from "../constants/constants";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface Word {
-	start: number;
-	end: number;
 	word: string;
+	start: number; // seconds (from transcription JSON)
+	end: number;   // seconds
+	confidence?: number;
 }
 
 interface ICaptionLine {
 	text: string;
 	words: Word[];
-	width: number;
-	start: number;
-	end: number;
+	start: number; // seconds
+	end: number;   // seconds
 }
+
+interface FontInfo {
+	fontFamily: string;
+	fontUrl: string;
+	fontSize: number;
+}
+
+export interface CaptionOptions {
+	containerWidth: number;
+	/** Maximum number of words per caption group. Default: 4. */
+	maxWordsPerCaption?: number;
+	parentId: string;
+	/** Timeline position (ms) of the clip this caption belongs to. */
+	displayFrom: number;
+	/**
+	 * Additional timing offset in milliseconds applied to every word's start/end.
+	 * Positive = shift later, negative = shift earlier.
+	 * Use negative values to compensate for any remaining LLM delay.
+	 * Default: 0 (the route already applies -150ms calibration).
+	 */
+	timingOffsetMs?: number;
+	/**
+	 * Minimum silence gap (seconds) that forces a new caption group even
+	 * if the current group hasn't hit maxWordsPerCaption yet.
+	 * Default: 0.75s
+	 */
+	silenceGapS?: number;
+}
+
+interface CaptionsInput {
+	sourceUrl: string;
+	results: {
+		main: {
+			words: Word[];
+		};
+	};
+}
+
+// ── Core caption generation ───────────────────────────────────────────────────
 
 export const generateCaption = (
 	captionLine: ICaptionLine,
 	fontInfo: FontInfo,
-	options: Options,
+	options: CaptionOptions,
 	sourceUrl: string,
 ): ICaption => {
+	const timingOffsetMs = options.timingOffsetMs ?? 0;
+
+	// Apply any additional user-specified timing offset (on top of server calibration)
+	const fromMs = options.displayFrom + captionLine.start * 1000 + timingOffsetMs;
+	const toMs = options.displayFrom + captionLine.end * 1000 + timingOffsetMs;
+
 	const caption = {
 		id: generateId(),
 		type: "caption",
 		name: "Caption",
 		display: {
-			from: options.displayFrom + captionLine.start * 1000,
-			to: options.displayFrom + captionLine.end * 1000,
+			from: Math.max(0, fromMs),
+			to: Math.max(0, toMs),
 		},
 		metadata: {
 			sourceUrl,
 			parentId: options.parentId,
 		},
 		details: {
-			// top: 100,
 			appearedColor: CAPTION_DEFAULTS.appearedColor,
 			activeColor: CAPTION_DEFAULTS.activeColor,
 			activeFillColor: CAPTION_DEFAULTS.activeFillColor,
@@ -49,122 +95,87 @@ export const generateCaption = (
 			fontFamily: fontInfo.fontFamily,
 			fontUrl: fontInfo.fontUrl,
 			textAlign: "center",
-			linesPerCaption: options.linesPerCaption,
+			linesPerCaption: 1,
 			words: captionLine.words.map((w) => ({
 				...w,
-				start: w.start * 1000,
-				end: w.end * 1000,
+				// Convert seconds → milliseconds for the player
+				start: w.start * 1000 + timingOffsetMs,
+				end: w.end * 1000 + timingOffsetMs,
 			})),
 		} as unknown,
 	};
 	return caption as ICaption;
 };
 
-interface Word {
-	word: string;
-	start: number;
-	end: number;
-	confidence: number;
-}
-
-interface CaptionsInput {
-	sourceUrl: string;
-	results: {
-		main: {
-			words: Word[];
-		};
-	};
-}
-
+/**
+ * Group words into caption lines.
+ *
+ * Strategy (in priority order):
+ *  1. Start a new group when a silence gap >= silenceGapS is detected.
+ *  2. Start a new group when maxWordsPerCaption has been reached.
+ *  3. Prefer breaking after sentence-ending punctuation (., !, ?).
+ *
+ * This replaces the old canvas-measureText approach which was unreliable when
+ * fonts aren't loaded and produced inconsistent line lengths.
+ */
 function createCaptionLines(
 	input: CaptionsInput,
-	fontInfo: FontInfo,
-	options: Options,
+	_fontInfo: FontInfo,      // kept for API compatibility
+	options: CaptionOptions,
 ): ICaptionLine[] {
-	const canvas = document.createElement("canvas");
-	const context = canvas.getContext("2d");
-	if (!context) return [];
-	context.font = `${fontInfo.fontSize}px ${fontInfo.fontFamily}`;
+	const words = input.results.main.words;
+	if (!words || words.length === 0) return [];
 
-	const captionLines: ICaptionLine[] = [];
-	const words: Word[] = input.results.main.words;
+	const maxWords = Math.max(1, options.maxWordsPerCaption ?? 4);
+	const silenceGapS = options.silenceGapS ?? 0.75;
 
-	let currentLine: ICaptionLine = {
-		text: "",
-		words: [],
-		width: 0,
-		start: words.length > 0 ? words[0].start : 0,
-		end: 0,
+	const lines: ICaptionLine[] = [];
+	let currentWords: Word[] = [];
+
+	const flushLine = () => {
+		if (currentWords.length === 0) return;
+		lines.push({
+			text: currentWords.map((w) => w.word).join(" "),
+			words: [...currentWords],
+			start: currentWords[0].start,
+			end: currentWords[currentWords.length - 1].end,
+		});
+		currentWords = [];
 	};
-	let linesCount = 0;
 
-	words.forEach((wordObj, index) => {
-		const wordWidth = context.measureText(wordObj.word).width;
+	words.forEach((word, index) => {
+		const prev = words[index - 1];
 
-		if (
-			currentLine.width + wordWidth > options.containerWidth - 100 ||
-			currentLine.text.endsWith(".")
-		) {
-			const advance = currentLine.text.endsWith(".");
-			// Check if it's time to start a new caption set
-			if (linesCount + 1 === options.linesPerCaption || advance) {
-				// Only push when lines count is correct
-				captionLines.push(currentLine);
-				linesCount = 0;
+		// Check for a long silence gap since the previous word
+		const silenceGap = prev ? word.start - prev.end : 0;
+		const isSilenceBreak = silenceGap >= silenceGapS;
 
-				// Reset currentLine for the next set of lines
-				currentLine = {
-					text: "",
-					words: [],
-					width: 0,
-					start: wordObj.start,
-					end: wordObj.end,
-				};
-			} else {
-				linesCount += 1;
+		// Check if the current group has hit the word limit
+		const isWordLimitReached = currentWords.length >= maxWords;
 
-				// Reset currentLine.width but keep other details to continue accumulation
-				currentLine.width = 0;
-			}
+		// Check if previous word ended a sentence
+		const prevWordText = prev?.word ?? "";
+		const isSentenceEnd = /[.!?]$/.test(prevWordText);
+
+		if (currentWords.length > 0 && (isSilenceBreak || isWordLimitReached || isSentenceEnd)) {
+			flushLine();
 		}
 
-		// Accumulate words and width for the current line
-		currentLine.text += (currentLine.text ? " " : "") + wordObj.word;
-		currentLine.words.push(wordObj);
-		currentLine.width += wordWidth;
-		currentLine.end = wordObj.end;
-
-		// Push the final line if it's the last word
-		if (index === words.length - 1 && currentLine.text) {
-			captionLines.push(currentLine);
-		}
+		currentWords.push(word);
 	});
 
-	return captionLines;
-}
-interface FontInfo {
-	fontFamily: string;
-	fontUrl: string;
-	fontSize: number;
-}
+	flushLine(); // push any remaining words
 
-interface Options {
-	containerWidth: number;
-	linesPerCaption: number;
-	parentId: string;
-	displayFrom: number;
+	return lines;
 }
 
 export function generateCaptions(
 	input: CaptionsInput,
 	fontInfo: FontInfo,
-	options: Options,
+	options: CaptionOptions,
 ): ICaption[] {
 	const captionLines = createCaptionLines(input, fontInfo, options);
-
-	const captions = captionLines.map((line) =>
+	return captionLines.map((line) =>
 		generateCaption(line, fontInfo, options, input.sourceUrl),
 	);
-
-	return captions;
 }
