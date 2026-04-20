@@ -77,16 +77,12 @@ export class VideoItem extends BaseItem {
 	private async prepareAssets() {
 		if (typeof window === "undefined") return;
 		try {
-			let videoUrl = this.src;
-			if (videoUrl.includes("/api/image-proxy")) {
-				videoUrl = videoUrl.replace("/api/image-proxy", "/api/video-proxy");
-			} else if (
-				videoUrl.includes(".r2.dev") &&
-				!videoUrl.includes("/api/video-proxy")
-			) {
-				videoUrl = `/api/video-proxy?url=${encodeURIComponent(videoUrl)}`;
-			}
-			const file = await getFileFromUrl(videoUrl);
+			// Fetch the video file directly from its source URL.
+			// R2 public buckets (pub-xxx.r2.dev) serve Access-Control-Allow-Origin: *
+			// so a direct cross-origin fetch works without a proxy.
+			// Using the proxy here would result in a 307 redirect back to R2 anyway,
+			// and we can skip that round-trip entirely.
+			const file = await getFileFromUrl(this.src);
 			if (!file || file.size === 0) return;
 			const { MP4Clip } = await import("@designcombo/frames");
 			this.clip = new MP4Clip(file.stream());
@@ -134,15 +130,9 @@ export class VideoItem extends BaseItem {
 
 	private async extractVideoThumbnail() {
 		if (!this.src) return;
-		let videoUrl = this.src;
-		if (videoUrl.includes("/api/image-proxy")) {
-			videoUrl = videoUrl.replace("/api/image-proxy", "/api/video-proxy");
-		} else if (
-			videoUrl.includes(".r2.dev") &&
-			!videoUrl.includes("/api/video-proxy")
-		) {
-			videoUrl = `/api/video-proxy?url=${encodeURIComponent(videoUrl)}`;
-		}
+		// Use the source URL directly — R2 public buckets support CORS (ACAO: *)
+		// so crossOrigin="anonymous" + direct URL works without a proxy.
+		const videoUrl = this.src;
 		await new Promise<void>((resolve) => {
 			const v = document.createElement("video");
 			v.crossOrigin = "anonymous";

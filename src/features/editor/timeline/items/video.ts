@@ -158,24 +158,14 @@ class Video extends Trimmable {
 		}
 
 		try {
-			// Ensure video URL uses video-proxy for CORS support
-			let videoUrl = this.src;
-
-			// If using image-proxy, switch to video-proxy
-			if (videoUrl.includes("/api/image-proxy")) {
-				videoUrl = videoUrl.replace("/api/image-proxy", "/api/video-proxy");
-			}
-			// If direct R2 URL, wrap with video-proxy
-			else if (
-				videoUrl.includes(".r2.dev") &&
-				!videoUrl.includes("/api/video-proxy")
-			) {
-				videoUrl = `/api/video-proxy?url=${encodeURIComponent(videoUrl)}`;
-			}
-
-			const file = await getFileFromUrl(videoUrl);
+			// Fetch the video file directly from its source URL.
+			// R2 public buckets (pub-xxx.r2.dev) serve Access-Control-Allow-Origin: *
+			// so a direct cross-origin fetch works without a proxy.
+			// Using the proxy here would result in a 307 redirect back to R2 anyway,
+			// and we can skip that round-trip entirely.
+			const file = await getFileFromUrl(this.src);
 			if (!file || file.size === 0) {
-				console.warn("Video file is empty or failed to load:", videoUrl);
+				console.warn("Video file is empty or failed to load:", this.src);
 				this.clip = null;
 				return;
 			}
@@ -287,16 +277,9 @@ class Video extends Trimmable {
 	private async extractVideoThumbnail(): Promise<void> {
 		if (!this.src) return;
 
-		// Ensure video URL uses video-proxy for CORS support
-		let videoUrl = this.src;
-		if (videoUrl.includes("/api/image-proxy")) {
-			videoUrl = videoUrl.replace("/api/image-proxy", "/api/video-proxy");
-		} else if (
-			videoUrl.includes(".r2.dev") &&
-			!videoUrl.includes("/api/video-proxy")
-		) {
-			videoUrl = `/api/video-proxy?url=${encodeURIComponent(videoUrl)}`;
-		}
+		// Use the source URL directly — R2 public buckets support CORS (ACAO: *)
+		// so crossOrigin="anonymous" + direct URL works without a proxy.
+		const videoUrl = this.src;
 
 		return new Promise<void>((resolve) => {
 			const video = document.createElement("video");
