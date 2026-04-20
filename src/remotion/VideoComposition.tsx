@@ -28,9 +28,11 @@ function resolveMediaSrc(src: string): string {
 	if (!src) return src;
 
 	// Match both absolute  (http://localhost:PORT/api/image-proxy?url=...)
-	// and relative (/api/image-proxy?url=...) proxy patterns
+	// and relative (/api/image-proxy?url=...) proxy patterns.
+	// Also handles /api/video-stream which is used by the thumbnail generator
+	// but should never reach trackItemsMap — included as a safety net.
 	const proxyPattern =
-		/(?:https?:\/\/[^/]+)?\/api\/(?:image-proxy|video-proxy)\?url=(.+)/;
+		/(?:https?:\/\/[^/]+)?\/api\/(?:image-proxy|video-proxy|video-stream)\?url=(.+)/;
 	const match = src.match(proxyPattern);
 	if (match) {
 		try {

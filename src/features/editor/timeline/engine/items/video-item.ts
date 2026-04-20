@@ -77,12 +77,21 @@ export class VideoItem extends BaseItem {
 	private async prepareAssets() {
 		if (typeof window === "undefined") return;
 		try {
-			// Fetch the video file directly from its source URL.
-			// R2 public buckets (pub-xxx.r2.dev) serve Access-Control-Allow-Origin: *
-			// so a direct cross-origin fetch works without a proxy.
-			// Using the proxy here would result in a 307 redirect back to R2 anyway,
-			// and we can skip that round-trip entirely.
-			const file = await getFileFromUrl(this.src);
+			// Use /api/video-stream (streaming proxy) — NOT /api/video-proxy (redirect).
+			// getFileFromUrl() needs to read the full response body, which requires a
+			// same-origin response. The redirect proxy sends the browser cross-origin
+			// to R2, where CORS headers on the bucket are required. The streaming proxy
+			// returns the bytes directly as a same-origin response, avoiding that.
+			let videoUrl = this.src;
+			if (videoUrl.includes("/api/image-proxy")) {
+				videoUrl = videoUrl.replace("/api/image-proxy", "/api/video-stream");
+			} else if (
+				videoUrl.includes(".r2.dev") &&
+				!videoUrl.includes("/api/video-stream")
+			) {
+				videoUrl = `/api/video-stream?url=${encodeURIComponent(videoUrl)}`;
+			}
+			const file = await getFileFromUrl(videoUrl);
 			if (!file || file.size === 0) return;
 			const { MP4Clip } = await import("@designcombo/frames");
 			this.clip = new MP4Clip(file.stream());
@@ -130,9 +139,18 @@ export class VideoItem extends BaseItem {
 
 	private async extractVideoThumbnail() {
 		if (!this.src) return;
-		// Use the source URL directly — R2 public buckets support CORS (ACAO: *)
-		// so crossOrigin="anonymous" + direct URL works without a proxy.
-		const videoUrl = this.src;
+		// Use /api/video-stream (streaming proxy) so the <video> element makes a
+		// same-origin request. crossOrigin="anonymous" on a cross-origin URL (R2)
+		// requires CORS headers from the bucket; the streaming proxy avoids that.
+		let videoUrl = this.src;
+		if (videoUrl.includes("/api/image-proxy")) {
+			videoUrl = videoUrl.replace("/api/image-proxy", "/api/video-stream");
+		} else if (
+			videoUrl.includes(".r2.dev") &&
+			!videoUrl.includes("/api/video-stream")
+		) {
+			videoUrl = `/api/video-stream?url=${encodeURIComponent(videoUrl)}`;
+		}
 		await new Promise<void>((resolve) => {
 			const v = document.createElement("video");
 			v.crossOrigin = "anonymous";
