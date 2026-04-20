@@ -14,6 +14,7 @@ import { AiImage } from "./ai-image";
 import { AiEdit } from "./ai-edit";
 import { Stickers } from "./stickers";
 import { Templates } from "./templates";
+import { Filters } from "./filters";
 
 const ActiveMenuItem = ({ projectId }: { projectId?: string }) => {
 	const { activeMenuItem } = useLayoutStore();
@@ -66,6 +67,10 @@ const ActiveMenuItem = ({ projectId }: { projectId?: string }) => {
 
 	if (activeMenuItem === "templates") {
 		return <Templates />;
+	}
+
+	if (activeMenuItem === "filters") {
+		return <Filters />;
 	}
 
 	return null;

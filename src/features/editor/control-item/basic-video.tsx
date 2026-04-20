@@ -15,6 +15,13 @@ import Speed from "./common/speed";
 import useLayoutStore from "../store/use-layout-store";
 import { Label } from "@/components/ui/label";
 import { Animations } from "./common/animations";
+import Brightness from "./common/brightness";
+import Contrast from "./common/contrast";
+import Saturation from "./common/saturation";
+import Hue from "./common/hue";
+import Sepia from "./common/sepia";
+import Grayscale from "./common/grayscale";
+import Blur from "./common/blur";
 
 const BasicVideo = ({
 	trackItem,
@@ -193,6 +200,76 @@ const BasicVideo = ({
 		});
 	};
 
+	const onChangeBrightness = (v: number) => {
+		dispatch(EDIT_OBJECT, {
+			payload: { [trackItem.id]: { details: { brightness: v } } },
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: { ...prev.details, brightness: v },
+		}));
+	};
+
+	const onChangeContrast = (v: number) => {
+		dispatch(EDIT_OBJECT, {
+			payload: { [trackItem.id]: { details: { contrast: v } } },
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: { ...prev.details, contrast: v },
+		}));
+	};
+
+	const onChangeSaturation = (v: number) => {
+		dispatch(EDIT_OBJECT, {
+			payload: { [trackItem.id]: { details: { saturation: v } } },
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: { ...prev.details, saturation: v },
+		}));
+	};
+
+	const onChangeHue = (v: number) => {
+		dispatch(EDIT_OBJECT, {
+			payload: { [trackItem.id]: { details: { hue: v } } },
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: { ...prev.details, hue: v },
+		}));
+	};
+
+	const onChangeSepia = (v: number) => {
+		dispatch(EDIT_OBJECT, {
+			payload: { [trackItem.id]: { details: { sepia: v } } },
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: { ...prev.details, sepia: v },
+		}));
+	};
+
+	const onChangeGrayscale = (v: number) => {
+		dispatch(EDIT_OBJECT, {
+			payload: { [trackItem.id]: { details: { grayscale: v } } },
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: { ...prev.details, grayscale: v },
+		}));
+	};
+
+	const onChangeBlur = (v: number) => {
+		dispatch(EDIT_OBJECT, {
+			payload: { [trackItem.id]: { details: { blur: v } } },
+		});
+		setProperties((prev) => ({
+			...prev,
+			details: { ...prev.details, blur: v },
+		}));
+	};
+
 	const components = [
 		{
 			key: "crop",
@@ -236,6 +313,42 @@ const BasicVideo = ({
 					<Rounded
 						onChange={(v: number) => onChangeBorderRadius(v)}
 						value={properties.details.borderRadius as number}
+					/>
+				</div>
+			),
+		},
+		{
+			key: "adjust",
+			component: (
+				<div className="flex flex-col gap-2">
+					<Label className="font-sans text-xs font-semibold">Adjust</Label>
+					<Brightness
+						onChange={onChangeBrightness}
+						value={(properties.details as any).brightness ?? 100}
+					/>
+					<Contrast
+						onChange={onChangeContrast}
+						value={(properties.details as any).contrast ?? 100}
+					/>
+					<Saturation
+						onChange={onChangeSaturation}
+						value={(properties.details as any).saturation ?? 100}
+					/>
+					<Hue
+						onChange={onChangeHue}
+						value={(properties.details as any).hue ?? 0}
+					/>
+					<Sepia
+						onChange={onChangeSepia}
+						value={(properties.details as any).sepia ?? 0}
+					/>
+					<Grayscale
+						onChange={onChangeGrayscale}
+						value={(properties.details as any).grayscale ?? 0}
+					/>
+					<Blur
+						onChange={onChangeBlur}
+						value={(properties.details as any).blur ?? 0}
 					/>
 				</div>
 			),

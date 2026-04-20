@@ -54,6 +54,7 @@ import {
 	ChevronsUp,
 	Volume2,
 	ShapesIcon,
+	SlidersHorizontal,
 } from "lucide-react";
 
 export type Icon = LucideIcon;
@@ -160,6 +161,7 @@ export const Icons = {
 	speed: ChevronsUp,
 
 	volume: Volume2,
+	filters: SlidersHorizontal,
 	elements: ({ ...props }: LucideProps) => (
 		<svg
 			viewBox="0 0 24 24"

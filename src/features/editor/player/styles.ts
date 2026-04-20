@@ -57,11 +57,22 @@ export const calculateTextStyles = (
 });
 
 function buildFilter(details: ITrackItem["details"]): string {
-	const brightness = details.brightness ?? 100;
-	const blur = details.blur ?? 0;
-	if (brightness === 100 && blur === 0) return "none";
+	const d = details as any;
+	const brightness = d.brightness ?? 100;
+	const blur = d.blur ?? 0;
+	const contrast = d.contrast ?? 100;
+	const saturation = d.saturation ?? 100;
+	const hue = d.hue ?? 0;
+	const sepia = d.sepia ?? 0;
+	const grayscale = d.grayscale ?? 0;
+
 	const parts: string[] = [];
 	if (brightness !== 100) parts.push(`brightness(${brightness}%)`);
+	if (contrast !== 100) parts.push(`contrast(${contrast}%)`);
+	if (saturation !== 100) parts.push(`saturate(${saturation}%)`);
+	if (hue !== 0) parts.push(`hue-rotate(${hue}deg)`);
+	if (sepia !== 0) parts.push(`sepia(${sepia}%)`);
+	if (grayscale !== 0) parts.push(`grayscale(${grayscale}%)`);
 	if (blur !== 0) parts.push(`blur(${blur}px)`);
 	return parts.join(" ") || "none";
 }

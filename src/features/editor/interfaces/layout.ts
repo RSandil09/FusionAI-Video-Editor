@@ -14,7 +14,8 @@ export type IMenuItem =
 	| "elements"
 	| "ai-image"
 	| "ai-edit"
-	| "stickers";
+	| "stickers"
+	| "filters";
 export interface ILayoutState {
 	cropTarget: ITrackItem | null;
 	trackItem: ITrackItem | null;

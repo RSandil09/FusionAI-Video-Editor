@@ -70,6 +70,12 @@ const MENU_ITEMS = [
 		ariaLabel: "Add transition effects",
 	},
 	{
+		id: "filters",
+		icon: Icons.filters,
+		label: "Filters",
+		ariaLabel: "Apply filters and color adjustments",
+	},
+	{
 		id: "ai-image",
 		icon: Icons.style,
 		label: "AI Image",
