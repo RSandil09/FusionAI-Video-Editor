@@ -6,24 +6,29 @@ import { getAnimations } from "../../utils/get-animations";
 import { calculateFrames } from "../../utils/frames";
 import { Img } from "remotion";
 
-// Ensure image URL is proxied for CORS support (browser only)
-// During Remotion server render, use direct URLs as-is - no localhost proxy available
+// Ensure image URL is proxied for CORS support (browser only).
+// During Remotion Lambda render the proxy is unreachable, so direct URLs are
+// used as-is — VideoComposition.resolveTrackItemSrcs strips proxy wrappers
+// before passing URLs to the render pipeline.
 function ensureProxiedUrl(src: string): string {
 	if (!src) return src;
 
-	// Already proxied
+	// Already going through a proxy route — leave as-is.
 	if (src.includes("/api/image-proxy") || src.includes("/api/video-proxy")) {
 		return src;
 	}
 
-	// Absolute URL (e.g. direct R2 from render) - use as-is
-	if (src.startsWith("http://") || src.startsWith("https://")) {
-		return src;
-	}
-
-	// Direct R2 URL (relative) needs to be proxied in browser
+	// R2 check BEFORE the generic https:// guard.
+	// Bug that was here: absolute R2 URLs (https://pub-xxx.r2.dev/...) were
+	// caught by the startsWith("https://") early-return and served without the
+	// proxy, causing CORS failures for crossOrigin="anonymous" image requests.
 	if (src.includes(".r2.dev")) {
 		return `/api/image-proxy?url=${encodeURIComponent(src)}`;
+	}
+
+	// External CDN or other absolute URL — serve directly.
+	if (src.startsWith("http://") || src.startsWith("https://")) {
+		return src;
 	}
 
 	return src;

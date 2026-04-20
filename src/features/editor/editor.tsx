@@ -120,6 +120,47 @@ const Editor = ({
 					merged.trackItemIds = recomputedIds;
 				}
 
+				// ── URL normalization ──────────────────────────────────────────────
+				// Walk every track item and ensure media src values are stored as raw
+				// URLs (not wrapped in old/broken proxy paths). The player items
+				// (image.tsx, video.tsx) apply the correct proxy wrapper at render time.
+				// This fixes projects saved before the ensureProxiedUrl bug was fixed —
+				// they may have stored bare https://pub-xxx.r2.dev URLs that bypassed
+				// the proxy, or stale proxy-wrapped URLs that no longer match the route.
+				const normalizedMap: Record<string, any> = {};
+				for (const [id, item] of Object.entries(merged.trackItemsMap as Record<string, any>)) {
+					const src: string | undefined = item?.details?.src;
+					if (!src) {
+						normalizedMap[id] = item;
+						continue;
+					}
+					let normalizedSrc = src;
+					// Strip broken image-proxy wrappers that used the old authenticated
+					// Node route — the URL inside is the canonical R2 URL.
+					const imageProxyMatch = src.match(/\/api\/image-proxy\?url=(.+)/);
+					if (imageProxyMatch) {
+						try {
+							normalizedSrc = decodeURIComponent(imageProxyMatch[1]);
+						} catch {
+							normalizedSrc = src;
+						}
+					}
+					// Strip video-proxy wrappers the same way.
+					const videoProxyMatch = src.match(/\/api\/video-proxy\?url=(.+)/);
+					if (videoProxyMatch) {
+						try {
+							normalizedSrc = decodeURIComponent(videoProxyMatch[1]);
+						} catch {
+							normalizedSrc = src;
+						}
+					}
+					normalizedMap[id] = normalizedSrc === src
+						? item
+						: { ...item, details: { ...item.details, src: normalizedSrc } };
+				}
+				merged.trackItemsMap = normalizedMap;
+				// ── end URL normalization ──────────────────────────────────────────
+
 				if (validateEditorState(merged)) {
 					editorState = merged;
 				} else {
@@ -159,6 +200,29 @@ const Editor = ({
 				setMutedTrackIds(filterTrackIds(s.mutedTrackIds));
 			if (Array.isArray(s.soloTrackIds))
 				setSoloTrackIds(filterTrackIds(s.soloTrackIds));
+
+			// ── Parallel media prefetch ────────────────────────────────────────────
+			// Fire HEAD requests for every media item in the background immediately
+			// after DESIGN_LOAD. This warms the browser's connection to R2/CDN and
+			// populates DNS + TCP state before the Remotion player requests the actual
+			// bytes, shaving the perceived first-frame latency on large projects.
+			// Errors are intentionally swallowed — prefetch failures are non-fatal.
+			const items = Object.values((s.trackItemsMap ?? {}) as Record<string, any>);
+			const mediaSrcs = items
+				.map((item: any) => item?.details?.src as string | undefined)
+				.filter((src): src is string => typeof src === "string" && src.startsWith("http"));
+
+			// Deduplicate and cap at 10 concurrent prefetches to avoid hammering R2
+			// on large projects while still warming the most-needed connections.
+			const uniqueSrcs = [...new Set(mediaSrcs)].slice(0, 10);
+			if (uniqueSrcs.length > 0) {
+				Promise.allSettled(
+					uniqueSrcs.map((src) =>
+						fetch(src, { method: "HEAD", cache: "force-cache" }).catch(() => null),
+					),
+				);
+			}
+			// ── end parallel media prefetch ────────────────────────────────────────
 		} catch (error) {
 			const msg = error instanceof Error ? error.message : String(error);
 			console.error("❌ Failed to load editor state:", msg);
