@@ -30,7 +30,7 @@ const serverEnvSchema = z.object({
 		.string()
 		.min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
 
-	// DesignCombo (required for render, transcribe)
+	// API secret key (required for render, transcribe)
 	COMBO_SK: z.string().min(1, "COMBO_SK is required for render and transcribe"),
 
 	// Optional - no validation

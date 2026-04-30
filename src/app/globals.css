@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 
@@ -227,7 +227,7 @@
 	font-size: 1rem;
 }
 
-.designcombo-scene-moveable .moveable-control {
+.fusion-scene-moveable .moveable-control {
 	background: #333 !important;
 	box-sizing: border-box !important;
 	display: block !important;
@@ -243,8 +243,8 @@
 	margin-left: -6px !important;
 }
 
-.designcombo-scene-moveable .moveable-control.moveable-n,
-.designcombo-scene-moveable .moveable-control.moveable-s {
+.fusion-scene-moveable .moveable-control.moveable-n,
+.fusion-scene-moveable .moveable-control.moveable-s {
 	width: 32px !important;
 	height: 8px !important;
 	margin-top: -4px !important;
@@ -254,8 +254,8 @@
 	cursor: crosshair !important;
 }
 
-.designcombo-scene-moveable .moveable-control.moveable-e,
-.designcombo-scene-moveable .moveable-control.moveable-w {
+.fusion-scene-moveable .moveable-control.moveable-e,
+.fusion-scene-moveable .moveable-control.moveable-w {
 	width: 8px !important;
 	height: 32px !important;
 	margin-left: -4px !important;
@@ -265,7 +265,7 @@
 	cursor: crosshair !important;
 }
 
-.designcombo-scene-moveable .moveable-rotation-control {
+.fusion-scene-moveable .moveable-rotation-control {
 	border: none !important;
 	background-image: url("data:image/svg+xml,%3Csvg%20width%3D%2724%27%20height%3D%2724%27%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20fill%3D%27%23757575%27%3E%3Cg%20fill%3D%27none%27%20fill-rule%3D%27evenodd%27%3E%3Ccircle%20stroke%3D%27%23CCD1DA%27%20fill%3D%27%23FFF%27%20cx%3D%2712%27%20cy%3D%2712%27%20r%3D%2711.5%27%2F%3E%3Cpath%20d%3D%27M16.242%2012.012a4.25%204.25%200%2000-5.944-4.158L9.696%206.48a5.75%205.75%200%20018.048%205.532h1.263l-2.01%203.002-2.008-3.002h1.253zm-8.484-.004a4.25%204.25%200%20005.943%203.638l.6%201.375a5.75%205.75%200%2001-8.046-5.013H5.023L7.02%209.004l1.997%203.004h-1.26z%27%20fill%3D%27%23000%27%20fill-rule%3D%27nonzero%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") !important;
 	width: 24px !important;
@@ -277,7 +277,7 @@
 	cursor: pointer !important;
 }
 
-.designcombo-scene-moveable .moveable-rotation .moveable-rotation-line {
+.fusion-scene-moveable .moveable-rotation .moveable-rotation-line {
 	display: none !important;
 }
 
