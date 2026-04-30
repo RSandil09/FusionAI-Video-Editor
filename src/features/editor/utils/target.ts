@@ -1,4 +1,4 @@
-export const getTargetControls = (targetType: string): string[] => {
+﻿export const getTargetControls = (targetType: string): string[] => {
 	switch (targetType) {
 		case "text":
 			return ["e", "se", "s"];
@@ -85,7 +85,7 @@ export const getTargetAbles = (targetType: string): ITargetAbles => {
 };
 
 export const getTypeFromClassName = (input: string): string | null => {
-	const regex = /designcombo-scene-item-type-([^ ]+)/;
+	const regex = /fusion-scene-item-type-([^ ]+)/;
 	const match = input.match(regex);
 	return match ? match[1] : null;
 };
@@ -118,7 +118,7 @@ export const getSelectionByIds = (ids: string[]): SelectionInfo => {
 		.map((id) => {
 			if (!id) return null;
 			const element = document.querySelector<HTMLElement>(
-				`.designcombo-scene-item.id-${id}`,
+				`.fusion-scene-item.id-${id}`,
 			);
 			return element;
 		})
@@ -147,7 +147,7 @@ export const getSelectionByIds = (ids: string[]): SelectionInfo => {
 
 export const getTargetById = (id: string): HTMLElement | null => {
 	const element = document.querySelector<HTMLElement>(
-		`.designcombo-scene-item.id-${id}`,
+		`.fusion-scene-item.id-${id}`,
 	);
 	return element;
 };

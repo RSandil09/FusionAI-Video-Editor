@@ -1,4 +1,4 @@
-import {
+﻿import {
 	Control,
 	Pattern,
 	Trimmable,
@@ -158,7 +158,7 @@ class Video extends Trimmable {
 		}
 
 		try {
-			// Use /api/video-stream (streaming proxy) — NOT /api/video-proxy (redirect).
+			// Use /api/video-stream (streaming proxy) â€” NOT /api/video-proxy (redirect).
 			// getFileFromUrl() needs to read the full response body, which requires a
 			// same-origin response. The redirect proxy sends the browser cross-origin
 			// to R2, where CORS headers on the bucket are required. The streaming proxy
@@ -616,7 +616,7 @@ class Video extends Trimmable {
 	}
 
 	public calulateWidthOnScreen() {
-		const canvasEl = document.getElementById("designcombo-timeline-canvas");
+		const canvasEl = document.getElementById("fusion-timeline-canvas");
 		const canvasWidth = canvasEl?.clientWidth;
 		const scrollLeft = this.scrollLeft;
 		if (!canvasWidth) return 0;

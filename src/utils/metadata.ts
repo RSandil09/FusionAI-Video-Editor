@@ -1,28 +1,28 @@
 import type { Metadata } from "next/types";
 
+const APP_URL =
+	process.env.NEXT_PUBLIC_APP_URL ??
+	(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
 export function createMetadata(override: Metadata): Metadata {
 	return {
 		...override,
 		openGraph: {
 			title: override.title ?? undefined,
 			description: override.description ?? undefined,
-			url: "https://designcombo.dev",
-			images: "/banner.png",
-			siteName: "Combo",
+			url: APP_URL,
+			images: "/FusionAI.svg",
+			siteName: "Fusion Video Editor",
 			...override.openGraph,
 		},
 		twitter: {
 			card: "summary_large_image",
-			creator: "@Combo",
 			title: override.title ?? undefined,
 			description: override.description ?? undefined,
-			images: "/banner.png",
+			images: "/FusionAI.svg",
 			...override.twitter,
 		},
 	};
 }
 
-export const baseUrl =
-	process.env.NODE_ENV === "development"
-		? new URL("http://localhost:3000")
-		: new URL("https://designcombo.dev");
+export const baseUrl = new URL(APP_URL);

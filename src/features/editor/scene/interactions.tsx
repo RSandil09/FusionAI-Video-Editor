@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { Selection, Moveable } from "@interactify/toolkit";
 import { getIdFromClassName } from "../utils/scene";
 import { dispatch } from "@designcombo/events";
@@ -126,7 +126,7 @@ export function SceneInteractions({
 			container: containerRef.current,
 			boundContainer: true,
 			hitRate: 0,
-			selectableTargets: [".designcombo-scene-item"],
+			selectableTargets: [".fusion-scene-item"],
 			selectFromInside: false,
 			selectByClick: true,
 			toggleContinueSelect: "shift",
@@ -134,7 +134,7 @@ export function SceneInteractions({
 			.on("select", (e) => {
 				// Filter out audio items from selection
 				const filteredSelected = e.selected.filter(
-					(el) => !el.className.includes("designcombo-scene-item-type-audio"),
+					(el) => !el.className.includes("fusion-scene-item-type-audio"),
 				);
 
 				const ids = filteredSelected.map((el) =>
@@ -182,7 +182,7 @@ export function SceneInteractions({
 				} else {
 					// Filter out audio items from selection
 					const filteredSelected = e.selected.filter(
-						(el) => !el.className.includes("designcombo-scene-item-type-audio"),
+						(el) => !el.className.includes("fusion-scene-item-type-audio"),
 					) as HTMLDivElement[];
 
 					const ids = filteredSelected.map((el) =>
@@ -236,7 +236,7 @@ export function SceneInteractions({
 			origin={false}
 			target={targets}
 			zoom={1 / zoom}
-			className="designcombo-scene-moveable"
+			className="fusion-scene-moveable"
 			snappable
 			elementGuidelines={elementGuidelines}
 			elementSnapDirections={snapDirections}

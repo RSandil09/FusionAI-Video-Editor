@@ -22,6 +22,14 @@ import {
 	Check,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { getIdToken } from "@/lib/auth/client";
 import { toast } from "sonner";
 import { UserMenu } from "@/components/auth/user-menu";
@@ -227,7 +235,7 @@ export default function Navbar({
 			<div className="flex h-16 items-center justify-end gap-3">
 				<div className="flex items-center gap-2">
 					<SaveButton projectId={projectId} stateManager={stateManager} />
-					<PublishPopover />
+					<PublishPopover projectId={projectId} />
 					<DownloadPopover stateManager={stateManager} projectId={projectId} />
 				</div>
 
@@ -253,10 +261,44 @@ const PLATFORMS: { id: string; label: string; dot: string }[] = [
 	{ id: "instagram", label: "Instagram", dot: "bg-pink-500" },
 ];
 
-const PublishPopover = () => {
+type PublishPlatform = "youtube" | "instagram" | "tiktok";
+type TikTokPrivacy =
+	| "SELF_ONLY"
+	| "FOLLOWER_OF_CREATOR"
+	| "MUTUAL_FOLLOW_FRIENDS"
+	| "PUBLIC_TO_EVERYONE";
+
+type PublishStage = "form" | "uploading" | "success" | "error";
+
+type PublishResult = {
+	platform: PublishPlatform;
+	url?: string;
+	embedUrl?: string;
+	videoId?: string;
+	privacy?: string;
+};
+
+const PublishPopover = ({ projectId }: { projectId?: string }) => {
 	const [open, setOpen] = useState(false);
 	const [connections, setConnections] = useState<SocialConnection[]>([]);
 	const [loading, setLoading] = useState(false);
+	const [activePlatform, setActivePlatform] = useState<PublishPlatform | null>(
+		null,
+	);
+	const [latestVideoUrl, setLatestVideoUrl] = useState<string | null>(null);
+	const [resolvingVideo, setResolvingVideo] = useState(false);
+
+	const [stage, setStage] = useState<PublishStage>("form");
+	const [progressLabel, setProgressLabel] = useState("Preparing upload…");
+	const [publishResult, setPublishResult] = useState<PublishResult | null>(
+		null,
+	);
+	const [publishError, setPublishError] = useState<string | null>(null);
+
+	const [youtubeTitle, setYoutubeTitle] = useState("My Video");
+	const [youtubeDescription, setYoutubeDescription] = useState("");
+	const [caption, setCaption] = useState("");
+	const [tiktokPrivacy, setTiktokPrivacy] = useState<TikTokPrivacy>("SELF_ONLY");
 
 	const fetchConnections = useCallback(async () => {
 		setLoading(true);
@@ -279,91 +321,536 @@ const PublishPopover = () => {
 		if (open) fetchConnections();
 	}, [open, fetchConnections]);
 
+	function resetDialog() {
+		setStage("form");
+		setPublishResult(null);
+		setPublishError(null);
+		setProgressLabel("Preparing upload…");
+	}
+
+	function closeDialog() {
+		setActivePlatform(null);
+		// Defer resetting state until the dialog has unmounted to avoid flicker.
+		setTimeout(resetDialog, 200);
+	}
+
+	async function openPublishDialog(platform: PublishPlatform) {
+		if (!projectId) {
+			toast.error("Open a saved project first");
+			return;
+		}
+		setResolvingVideo(true);
+		try {
+			const token = await getIdToken();
+			if (!token) {
+				toast.error("Please log in");
+				return;
+			}
+			const res = await fetch(
+				`/api/projects/${projectId}/latest-render`,
+				{ headers: { Authorization: `Bearer ${token}` } },
+			);
+			if (!res.ok) {
+				toast.error("Failed to look up your last export");
+				return;
+			}
+			const data = await res.json();
+			if (!data.render?.videoUrl) {
+				toast.error("Export the video first, then publish from here");
+				return;
+			}
+			setLatestVideoUrl(data.render.videoUrl);
+			resetDialog();
+			setActivePlatform(platform);
+			setOpen(false);
+		} finally {
+			setResolvingVideo(false);
+		}
+	}
+
+	async function doPublish() {
+		if (!activePlatform || !latestVideoUrl) return;
+		const token = await getIdToken();
+		if (!token) {
+			toast.error("Please log in");
+			return;
+		}
+
+		const platform = activePlatform;
+		setStage("uploading");
+		setPublishError(null);
+		setProgressLabel(
+			platform === "youtube"
+				? "Sending video to YouTube…"
+				: platform === "instagram"
+					? "Creating Instagram media container…"
+					: "Sending video to TikTok…",
+		);
+
+		// Instagram polls server-side for ~2 min, so update the label after a delay.
+		const labelTimer =
+			platform === "instagram"
+				? setTimeout(
+						() => setProgressLabel("Instagram is processing the video…"),
+						5000,
+					)
+				: null;
+
+		try {
+			const res = await fetch("/api/share", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				body: JSON.stringify({
+					platform,
+					videoUrl: latestVideoUrl,
+					title: youtubeTitle || "My Video",
+					description: youtubeDescription || "",
+					caption: caption || "",
+					privacyLevel: tiktokPrivacy,
+				}),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				setPublishError(data.error || `Failed to publish to ${platform}`);
+				setStage("error");
+				return;
+			}
+			setPublishResult({
+				platform,
+				url: data.url,
+				embedUrl: data.embedUrl,
+				videoId: data.videoId,
+				privacy: data.privacy,
+			});
+			setStage("success");
+			toast.success(`Published to ${platform}!`);
+		} catch (e) {
+			setPublishError(
+				e instanceof Error ? e.message : `Failed to publish to ${platform}`,
+			);
+			setStage("error");
+		} finally {
+			if (labelTimer) clearTimeout(labelTimer);
+		}
+	}
+
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					className="flex h-8 gap-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-					variant="ghost"
-					size="sm"
-				>
-					<ShareIcon width={14} />
-					<span className="hidden md:block text-xs font-medium">Publish</span>
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent
-				align="end"
-				className="bg-sidebar z-[250] flex w-64 flex-col gap-3 rounded-2xl border-border/60 p-4"
-			>
-				<div className="flex items-center gap-2">
-					<ShareIcon width={13} className="text-primary" />
-					<Label className="text-sm font-semibold">Publish to</Label>
-				</div>
-
-				{loading ? (
-					<div className="flex justify-center py-4">
-						<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-					</div>
-				) : (
-					<div className="flex flex-col gap-2">
-						{PLATFORMS.map((platform) => {
-							const conn = connections.find((c) => c.provider === platform.id);
-							return (
-								<div
-									key={platform.id}
-									className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 px-3 py-2.5"
-								>
-									<div className="flex items-center gap-2.5">
-										<div className={`h-2 w-2 rounded-full ${platform.dot}`} />
-										<div>
-											<div className="text-sm font-medium">{platform.label}</div>
-											{conn?.provider_username && (
-												<div className="text-xs text-muted-foreground">
-													@{conn.provider_username}
-												</div>
-											)}
-										</div>
-									</div>
-									{conn ? (
-										<Button
-											size="sm"
-											className="h-7 rounded-lg px-3 text-xs"
-											onClick={() =>
-												toast.info(`Publishing to ${platform.label} coming soon`)
-											}
-										>
-											Publish
-										</Button>
-									) : (
-										<Link
-											href="/settings?tab=connections"
-											onClick={() => setOpen(false)}
-											className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-										>
-											Connect <ExternalLink width={10} />
-										</Link>
-									)}
-								</div>
-							);
-						})}
-					</div>
-				)}
-
-				<p className="text-xs leading-relaxed text-muted-foreground">
-					Connect accounts in{" "}
-					<Link
-						href="/settings?tab=connections"
-						className="text-primary hover:underline"
-						onClick={() => setOpen(false)}
+		<>
+			<Popover open={open} onOpenChange={setOpen}>
+				<PopoverTrigger asChild>
+					<Button
+						className="flex h-8 gap-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+						variant="ghost"
+						size="sm"
 					>
-						Settings
-					</Link>{" "}
-					to publish directly.
-				</p>
-			</PopoverContent>
-		</Popover>
+						<ShareIcon width={14} />
+						<span className="hidden md:block text-xs font-medium">Publish</span>
+					</Button>
+				</PopoverTrigger>
+				<PopoverContent
+					align="end"
+					className="bg-sidebar z-[250] flex w-64 flex-col gap-3 rounded-2xl border-border/60 p-4"
+				>
+					<div className="flex items-center gap-2">
+						<ShareIcon width={13} className="text-primary" />
+						<Label className="text-sm font-semibold">Publish to</Label>
+					</div>
+
+					{loading ? (
+						<div className="flex justify-center py-4">
+							<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+						</div>
+					) : (
+						<div className="flex flex-col gap-2">
+							{PLATFORMS.map((platform) => {
+								const conn = connections.find(
+									(c) => c.provider === platform.id,
+								);
+								const isResolving =
+									resolvingVideo && activePlatform === platform.id;
+								return (
+									<div
+										key={platform.id}
+										className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/20 px-3 py-2.5"
+									>
+										<div className="flex items-center gap-2.5">
+											<div className={`h-2 w-2 rounded-full ${platform.dot}`} />
+											<div>
+												<div className="text-sm font-medium">
+													{platform.label}
+												</div>
+												{conn?.provider_username && (
+													<div className="text-xs text-muted-foreground">
+														@{conn.provider_username}
+													</div>
+												)}
+											</div>
+										</div>
+										{conn ? (
+											<Button
+												size="sm"
+												className="h-7 rounded-lg px-3 text-xs"
+												disabled={resolvingVideo}
+												onClick={() =>
+													openPublishDialog(platform.id as PublishPlatform)
+												}
+											>
+												{isResolving ? (
+													<Loader2 className="h-3 w-3 animate-spin" />
+												) : (
+													"Publish"
+												)}
+											</Button>
+										) : (
+											<Link
+												href="/settings?tab=connections"
+												onClick={() => setOpen(false)}
+												className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+											>
+												Connect <ExternalLink width={10} />
+											</Link>
+										)}
+									</div>
+								);
+							})}
+						</div>
+					)}
+
+					<p className="text-xs leading-relaxed text-muted-foreground">
+						Connect accounts in{" "}
+						<Link
+							href="/settings?tab=connections"
+							className="text-primary hover:underline"
+							onClick={() => setOpen(false)}
+						>
+							Settings
+						</Link>{" "}
+						to publish directly. Export the video first to enable Publish.
+					</p>
+				</PopoverContent>
+			</Popover>
+
+			<Dialog
+				open={activePlatform === "youtube"}
+				onOpenChange={(o) => !o && stage !== "uploading" && closeDialog()}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>
+							{stage === "success"
+								? "Published to YouTube"
+								: stage === "error"
+									? "Upload failed"
+									: "Publish to YouTube"}
+						</DialogTitle>
+					</DialogHeader>
+
+					{stage === "form" && (
+						<div className="space-y-4 py-2">
+							<div className="space-y-2">
+								<Label htmlFor="np-yt-title">Title</Label>
+								<Input
+									id="np-yt-title"
+									value={youtubeTitle}
+									onChange={(e) => setYoutubeTitle(e.target.value)}
+									maxLength={100}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="np-yt-desc">Description (optional)</Label>
+								<Textarea
+									id="np-yt-desc"
+									value={youtubeDescription}
+									onChange={(e) => setYoutubeDescription(e.target.value)}
+									maxLength={5000}
+								/>
+							</div>
+							<p className="text-xs text-muted-foreground">
+								Videos are uploaded as <strong>private</strong> by default. You
+								can change visibility on YouTube Studio.
+							</p>
+							<div className="flex justify-end gap-2">
+								<Button variant="outline" onClick={closeDialog}>
+									Cancel
+								</Button>
+								<Button onClick={doPublish}>Upload to YouTube</Button>
+							</div>
+						</div>
+					)}
+
+					{stage === "uploading" && (
+						<UploadingView label={progressLabel} />
+					)}
+
+					{stage === "success" && publishResult && (
+						<SuccessView result={publishResult} onClose={closeDialog} />
+					)}
+
+					{stage === "error" && (
+						<ErrorView
+							message={publishError}
+							onRetry={() => setStage("form")}
+							onClose={closeDialog}
+						/>
+					)}
+				</DialogContent>
+			</Dialog>
+
+			<Dialog
+				open={activePlatform === "instagram"}
+				onOpenChange={(o) => !o && stage !== "uploading" && closeDialog()}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>
+							{stage === "success"
+								? "Published to Instagram"
+								: stage === "error"
+									? "Upload failed"
+									: "Publish to Instagram"}
+						</DialogTitle>
+					</DialogHeader>
+
+					{stage === "form" && (
+						<div className="space-y-4 py-2">
+							<div className="space-y-2">
+								<Label htmlFor="np-ig-cap">Caption (optional)</Label>
+								<Textarea
+									id="np-ig-cap"
+									value={caption}
+									onChange={(e) => setCaption(e.target.value)}
+									placeholder="Write a caption..."
+									maxLength={2200}
+								/>
+							</div>
+							<div className="flex justify-end gap-2">
+								<Button variant="outline" onClick={closeDialog}>
+									Cancel
+								</Button>
+								<Button onClick={doPublish}>Share to Instagram</Button>
+							</div>
+						</div>
+					)}
+
+					{stage === "uploading" && (
+						<UploadingView label={progressLabel} />
+					)}
+
+					{stage === "success" && publishResult && (
+						<SuccessView result={publishResult} onClose={closeDialog} />
+					)}
+
+					{stage === "error" && (
+						<ErrorView
+							message={publishError}
+							onRetry={() => setStage("form")}
+							onClose={closeDialog}
+						/>
+					)}
+				</DialogContent>
+			</Dialog>
+
+			<Dialog
+				open={activePlatform === "tiktok"}
+				onOpenChange={(o) => !o && stage !== "uploading" && closeDialog()}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>
+							{stage === "success"
+								? "Published to TikTok"
+								: stage === "error"
+									? "Upload failed"
+									: "Publish to TikTok"}
+						</DialogTitle>
+					</DialogHeader>
+
+					{stage === "form" && (
+						<div className="space-y-4 py-2">
+							<div className="space-y-2">
+								<Label htmlFor="np-tt-cap">Caption (optional)</Label>
+								<Textarea
+									id="np-tt-cap"
+									value={caption}
+									onChange={(e) => setCaption(e.target.value)}
+									placeholder="Write a caption..."
+									maxLength={2200}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="np-tt-priv">Who can view</Label>
+								<select
+									id="np-tt-priv"
+									value={tiktokPrivacy}
+									onChange={(e) =>
+										setTiktokPrivacy(e.target.value as TikTokPrivacy)
+									}
+									className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+								>
+									<option value="SELF_ONLY">Only me</option>
+									<option value="MUTUAL_FOLLOW_FRIENDS">Friends</option>
+									<option value="FOLLOWER_OF_CREATOR">Followers</option>
+									<option value="PUBLIC_TO_EVERYONE">Everyone</option>
+								</select>
+							</div>
+							<div className="flex justify-end gap-2">
+								<Button variant="outline" onClick={closeDialog}>
+									Cancel
+								</Button>
+								<Button onClick={doPublish}>Upload to TikTok</Button>
+							</div>
+						</div>
+					)}
+
+					{stage === "uploading" && (
+						<UploadingView label={progressLabel} />
+					)}
+
+					{stage === "success" && publishResult && (
+						<SuccessView result={publishResult} onClose={closeDialog} />
+					)}
+
+					{stage === "error" && (
+						<ErrorView
+							message={publishError}
+							onRetry={() => setStage("form")}
+							onClose={closeDialog}
+						/>
+					)}
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 };
+
+function UploadingView({ label }: { label: string }) {
+	return (
+		<div className="flex flex-col items-center gap-4 py-8">
+			<div className="relative">
+				<Loader2 className="h-10 w-10 animate-spin text-primary" />
+			</div>
+			<p className="text-sm text-foreground">{label}</p>
+			<p className="text-xs text-muted-foreground text-center max-w-[280px]">
+				Don't close this window — large videos can take a few minutes.
+			</p>
+		</div>
+	);
+}
+
+function SuccessView({
+	result,
+	onClose,
+}: {
+	result: PublishResult;
+	onClose: () => void;
+}) {
+	const [copied, setCopied] = useState(false);
+	return (
+		<div className="space-y-4 py-2">
+			<div className="flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-2.5">
+				<CheckCircle2 className="h-5 w-5 text-green-500 flex-none" />
+				<div className="text-sm">
+					<div className="font-medium">
+						Successfully published to{" "}
+						{result.platform === "youtube"
+							? "YouTube"
+							: result.platform === "instagram"
+								? "Instagram"
+								: "TikTok"}
+					</div>
+					{result.privacy && (
+						<div className="text-xs text-muted-foreground">
+							Visibility: {result.privacy}
+						</div>
+					)}
+				</div>
+			</div>
+
+			{result.embedUrl && result.platform === "youtube" && (
+				<div className="overflow-hidden rounded-lg border border-border/60 bg-black aspect-video">
+					<iframe
+						src={result.embedUrl}
+						title="Published video"
+						className="w-full h-full"
+						allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+						allowFullScreen
+					/>
+				</div>
+			)}
+
+			{result.url && (
+				<div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/40 px-3 py-2 text-xs">
+					<span className="flex-1 truncate font-mono text-muted-foreground">
+						{result.url}
+					</span>
+					<Button
+						variant="ghost"
+						size="sm"
+						className="h-7 px-2 text-xs"
+						onClick={async () => {
+							if (!result.url) return;
+							await navigator.clipboard.writeText(result.url);
+							setCopied(true);
+							setTimeout(() => setCopied(false), 1500);
+						}}
+					>
+						{copied ? (
+							<Check className="h-3 w-3" />
+						) : (
+							"Copy"
+						)}
+					</Button>
+				</div>
+			)}
+
+			<div className="flex justify-end gap-2">
+				{result.url && (
+					<Button
+						variant="outline"
+						onClick={() => window.open(result.url, "_blank")}
+					>
+						<ExternalLink className="h-4 w-4 mr-1.5" />
+						Open
+					</Button>
+				)}
+				<Button onClick={onClose}>Done</Button>
+			</div>
+		</div>
+	);
+}
+
+function ErrorView({
+	message,
+	onRetry,
+	onClose,
+}: {
+	message: string | null;
+	onRetry: () => void;
+	onClose: () => void;
+}) {
+	return (
+		<div className="space-y-4 py-2">
+			<div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5">
+				<AlertCircle className="h-5 w-5 text-destructive flex-none mt-0.5" />
+				<div className="text-sm">
+					<div className="font-medium">Upload failed</div>
+					<div className="text-xs text-muted-foreground mt-1">
+						{message ?? "Something went wrong."}
+					</div>
+				</div>
+			</div>
+			<div className="flex justify-end gap-2">
+				<Button variant="outline" onClick={onClose}>
+					Close
+				</Button>
+				<Button onClick={onRetry}>Try Again</Button>
+			</div>
+		</div>
+	);
+}
 
 // ─── Export ─────────────────────────────────────────────────────────────────
 

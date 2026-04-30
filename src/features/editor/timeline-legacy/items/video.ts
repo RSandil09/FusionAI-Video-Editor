@@ -1,4 +1,4 @@
-import {
+﻿import {
 	Control,
 	Pattern,
 	Trimmable,
@@ -275,7 +275,7 @@ class Video extends Trimmable {
 	private async extractVideoThumbnail(): Promise<void> {
 		if (!this.src) return;
 
-		// Use the source URL directly — R2 public buckets support CORS (ACAO: *)
+		// Use the source URL directly â€” R2 public buckets support CORS (ACAO: *)
 		// so crossOrigin="anonymous" + direct URL works without a proxy.
 		const videoUrl = this.src;
 
@@ -595,7 +595,7 @@ class Video extends Trimmable {
 	}
 
 	public calulateWidthOnScreen() {
-		const canvasEl = document.getElementById("designcombo-timeline-canvas");
+		const canvasEl = document.getElementById("fusion-timeline-canvas");
 		const canvasWidth = canvasEl?.clientWidth;
 		const scrollLeft = this.scrollLeft;
 		if (!canvasWidth) return 0;

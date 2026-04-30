@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import Header from "./header";
 import Ruler from "./ruler";
 import { timeMsToUnits, unitsToTimeMs } from "./engine/types";
@@ -22,7 +22,7 @@ import { buildEngineCallbacks, applyTransition } from "../hooks/use-engine-sync"
 import { TransitionPicker } from "./transition-picker";
 import type { TransitionDef } from "../data/transitions";
 
-// ── Constants — must match canvas-engine.ts ───────────────────────────────────
+// â”€â”€ Constants â€” must match canvas-engine.ts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SIZES_MAP: Record<string, number> = {
 	caption: 32,
 	text: 32,
@@ -78,7 +78,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 	const currentFrame = useCurrentPlayerFrame(playerRef);
 	const timelineOffsetX = useTimelineOffsetX();
 
-	// ── Engine scroll callback — updates both scrollbars and track labels ────────
+	// â”€â”€ Engine scroll callback â€” updates both scrollbars and track labels â”€â”€â”€â”€â”€â”€â”€â”€
 	const onScroll = useCallback(
 		(v: { scrollTop?: number; scrollLeft?: number }) => {
 			if (v.scrollLeft !== undefined) {
@@ -102,7 +102,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		[],
 	);
 
-	// ── Mount engine once ────────────────────────────────────────────────────────
+	// â”€â”€ Mount engine once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	useEffect(() => {
 		const canvasEl = canvasElRef.current;
 		const containerEl = canvasContainerRef.current;
@@ -191,7 +191,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// ── ResizeObserver — keep canvas filling its container ───────────────────────
+	// â”€â”€ ResizeObserver â€” keep canvas filling its container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	useEffect(() => {
 		const containerEl = canvasContainerRef.current;
 		if (!containerEl) return;
@@ -206,7 +206,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		return () => ro.disconnect();
 	}, []);
 
-	// ── Sync structural state → engine (tracks/items/scale/duration + meta) ──────
+	// â”€â”€ Sync structural state â†’ engine (tracks/items/scale/duration + meta) â”€â”€â”€â”€â”€â”€
 	// Meta (locked/muted/solo) is applied in the same effect so there's no
 	// 1-frame flash where rows briefly show as unlocked/unmuted.
 	useEffect(() => {
@@ -221,7 +221,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 			sizesMap: SIZES_MAP,
 			trackGap: TRACK_GAP,
 			canvasTopOffset: CANVAS_TOP_OFFSET,
-			// activeIds intentionally omitted — handled by the dedicated effect below
+			// activeIds intentionally omitted â€” handled by the dedicated effect below
 		});
 		for (const row of eng.getTrackRows()) {
 			eng.setTrackMeta(row.id, {
@@ -241,24 +241,24 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		soloTrackIds,
 	]);
 
-	// ── Sync selection only — lightweight, no full rebuild ────────────────────────
+	// â”€â”€ Sync selection only â€” lightweight, no full rebuild â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	useEffect(() => {
 		engineRef.current?.setActiveIds(activeIds);
 	}, [activeIds]);
 
-	// ── Sync markers from store → engine (covers restore-from-DB on load) ────────
+	// â”€â”€ Sync markers from store â†’ engine (covers restore-from-DB on load) â”€â”€â”€â”€â”€â”€â”€â”€
 	useEffect(() => {
 		if (!engineRef.current) return;
 		engineRef.current.setMarkers(markers);
 	}, [markers]);
 
-	// ── Playhead ─────────────────────────────────────────────────────────────────
+	// â”€â”€ Playhead â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	useEffect(() => {
 		if (!engineRef.current || !fps) return;
 		engineRef.current.setPlayheadMs((currentFrame / fps) * 1000);
 	}, [currentFrame, fps]);
 
-	// ── Auto-scroll canvas to keep playhead visible ──────────────────────────────
+	// â”€â”€ Auto-scroll canvas to keep playhead visible â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	useEffect(() => {
 		const hVp = horizontalScrollbarVpRef.current;
 		if (!hVp || !fps) return;
@@ -277,7 +277,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		}
 	}, [currentFrame]);
 
-	// ── Listen for legacy TIMELINE_BOUNDING_CHANGED events ──────────────────────
+	// â”€â”€ Listen for legacy TIMELINE_BOUNDING_CHANGED events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	useEffect(() => {
 		const sub = subject
 			.pipe(filter(({ key }) => key.startsWith(TIMELINE_PREFIX)))
@@ -290,7 +290,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		return () => sub.unsubscribe();
 	}, []);
 
-	// ── Scrollbar event handlers ─────────────────────────────────────────────────
+	// â”€â”€ Scrollbar event handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	const handleScrollH = (e: React.UIEvent<HTMLDivElement>) => {
 		const sl = e.currentTarget.scrollLeft;
 		engineRef.current?.scrollTo({ scrollLeft: sl });
@@ -303,7 +303,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		setScrollTop(st);
 	};
 
-	// ── Ruler ─────────────────────────────────────────────────────────────────────
+	// â”€â”€ Ruler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	const onClickRuler = (units: number) => {
 		const timeMs = unitsToTimeMs(units, scale.zoom);
 		playerRef?.current?.seekTo(Math.round((timeMs * fps) / 1000));
@@ -316,7 +316,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 		setScrollLeft(newLeft);
 	};
 
-	// ── Track meta → engine ───────────────────────────────────────────────────────
+	// â”€â”€ Track meta â†’ engine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 	const handleTrackMetaChange = useCallback(
 		(
 			trackId: string,
@@ -376,7 +376,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 
 			{/* Track area */}
 			<div className="flex flex-1 overflow-hidden">
-				{/* Track labels — left column, clips overflow, mirrors canvas scroll via translateY */}
+				{/* Track labels â€” left column, clips overflow, mirrors canvas scroll via translateY */}
 				<div
 					id="track-labels-container"
 					style={{ width: timelineOffsetX, flexShrink: 0, overflow: "hidden" }}
@@ -394,7 +394,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 					className="relative flex-1 overflow-hidden"
 				>
 					<canvas
-						id="designcombo-timeline-canvas"
+						id="fusion-timeline-canvas"
 						ref={canvasElRef}
 						style={{ display: "block", position: "absolute", top: 0, left: 0 }}
 					/>

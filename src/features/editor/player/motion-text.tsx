@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { TextAnimated } from "./animated/text-animated";
 import { ITextDetails } from "@designcombo/types";
 
@@ -109,7 +109,7 @@ const TextLayer: React.FC<{
 			}}
 			suppressContentEditableWarning
 			// dangerouslySetInnerHTML={{ __html: content }}
-			className="designcombo_textLayer"
+			className="fusion-text-layer"
 		>
 			{!editable ? (
 				<TextAnimated

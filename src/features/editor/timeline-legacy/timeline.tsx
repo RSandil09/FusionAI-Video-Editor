@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import Header from "./header";
 import Ruler from "./ruler";
 import { timeMsToUnits, unitsToTimeMs } from "@designcombo/timeline";
@@ -60,7 +60,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 	const canvasRef = useRef<CanvasTimeline | null>(null);
 	const verticalScrollbarVpRef = useRef<HTMLDivElement>(null);
 	const horizontalScrollbarVpRef = useRef<HTMLDivElement>(null);
-	// Direct ref to the track-labels inner scroll container — synced in onScroll
+	// Direct ref to the track-labels inner scroll container â€” synced in onScroll
 	const trackLabelsRef = useRef<HTMLDivElement>(null);
 	const { scale, playerRef, fps, duration, timeline } = useStore();
 	const currentFrame = useCurrentPlayerFrame(playerRef);
@@ -83,7 +83,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 			horizontalScrollbarVpRef.current.scrollLeft = -v.scrollLeft;
 			setScrollLeft(-v.scrollLeft);
 		}
-		// Sync track labels directly — no event-listener chain, always in sync
+		// Sync track labels directly â€” no event-listener chain, always in sync
 		if (trackLabelsRef.current) {
 			trackLabelsRef.current.scrollTop = -v.scrollTop;
 		}
@@ -335,7 +335,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 						ref={containerRef}
 						className="absolute top-0 w-full"
 					>
-						<canvas id="designcombo-timeline-canvas" ref={canvasElRef} />
+						<canvas id="fusion-timeline-canvas" ref={canvasElRef} />
 					</div>
 					<ScrollArea.Root
 						type="always"

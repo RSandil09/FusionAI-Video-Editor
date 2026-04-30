@@ -57,6 +57,18 @@ export function ShareSection({ videoUrl, onShareSuccess }: ShareSectionProps) {
 	const [youtubeTitle, setYoutubeTitle] = useState("My Video");
 	const [youtubeDescription, setYoutubeDescription] = useState("");
 
+	const [showInstagramDialog, setShowInstagramDialog] = useState(false);
+	const [instagramCaption, setInstagramCaption] = useState("");
+
+	const [showTikTokDialog, setShowTikTokDialog] = useState(false);
+	const [tiktokCaption, setTiktokCaption] = useState("");
+	const [tiktokPrivacy, setTiktokPrivacy] = useState<
+		| "SELF_ONLY"
+		| "FOLLOWER_OF_CREATOR"
+		| "MUTUAL_FOLLOW_FRIENDS"
+		| "PUBLIC_TO_EVERYONE"
+	>("SELF_ONLY");
+
 	useEffect(() => {
 		loadConnections();
 	}, []);
@@ -89,13 +101,24 @@ export function ShareSection({ videoUrl, onShareSuccess }: ShareSectionProps) {
 			setShowYoutubeDialog(true);
 			return;
 		}
-		await doShare(platform);
+		if (platform === "instagram") {
+			setShowInstagramDialog(true);
+			return;
+		}
+		if (platform === "tiktok") {
+			setShowTikTokDialog(true);
+			return;
+		}
 	}
 
 	async function doShare(
 		platform: "youtube" | "instagram" | "tiktok",
-		title?: string,
-		description?: string,
+		opts: {
+			title?: string;
+			description?: string;
+			caption?: string;
+			privacyLevel?: string;
+		} = {},
 	) {
 		const token = await getIdToken();
 		if (!token) {
@@ -114,8 +137,10 @@ export function ShareSection({ videoUrl, onShareSuccess }: ShareSectionProps) {
 				body: JSON.stringify({
 					platform,
 					videoUrl,
-					title: title || "My Video",
-					description: description || "",
+					title: opts.title || "My Video",
+					description: opts.description || "",
+					caption: opts.caption || "",
+					privacyLevel: opts.privacyLevel || "SELF_ONLY",
 				}),
 			});
 			const data = await res.json().catch(() => ({}));
@@ -134,6 +159,8 @@ export function ShareSection({ videoUrl, onShareSuccess }: ShareSectionProps) {
 		} finally {
 			setSharing(null);
 			setShowYoutubeDialog(false);
+			setShowInstagramDialog(false);
+			setShowTikTokDialog(false);
 		}
 	}
 
@@ -220,7 +247,10 @@ export function ShareSection({ videoUrl, onShareSuccess }: ShareSectionProps) {
 							</Button>
 							<Button
 								onClick={() =>
-									doShare("youtube", youtubeTitle, youtubeDescription)
+									doShare("youtube", {
+										title: youtubeTitle,
+										description: youtubeDescription,
+									})
 								}
 								disabled={sharing === "youtube"}
 							>
@@ -228,6 +258,108 @@ export function ShareSection({ videoUrl, onShareSuccess }: ShareSectionProps) {
 									<Loader2 className="h-4 w-4 animate-spin" />
 								) : (
 									"Upload to YouTube"
+								)}
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog
+				open={showInstagramDialog}
+				onOpenChange={setShowInstagramDialog}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Share to Instagram</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 py-2">
+						<div className="space-y-2">
+							<Label htmlFor="ig-caption">Caption (optional)</Label>
+							<Textarea
+								id="ig-caption"
+								value={instagramCaption}
+								onChange={(e) => setInstagramCaption(e.target.value)}
+								placeholder="Write a caption..."
+								maxLength={2200}
+							/>
+						</div>
+						<div className="flex justify-end gap-2">
+							<Button
+								variant="outline"
+								onClick={() => setShowInstagramDialog(false)}
+							>
+								Cancel
+							</Button>
+							<Button
+								onClick={() =>
+									doShare("instagram", { caption: instagramCaption })
+								}
+								disabled={sharing === "instagram"}
+							>
+								{sharing === "instagram" ? (
+									<Loader2 className="h-4 w-4 animate-spin" />
+								) : (
+									"Share to Instagram"
+								)}
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={showTikTokDialog} onOpenChange={setShowTikTokDialog}>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Share to TikTok</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 py-2">
+						<div className="space-y-2">
+							<Label htmlFor="tt-caption">Caption (optional)</Label>
+							<Textarea
+								id="tt-caption"
+								value={tiktokCaption}
+								onChange={(e) => setTiktokCaption(e.target.value)}
+								placeholder="Write a caption..."
+								maxLength={2200}
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="tt-privacy">Who can view</Label>
+							<select
+								id="tt-privacy"
+								value={tiktokPrivacy}
+								onChange={(e) =>
+									setTiktokPrivacy(e.target.value as typeof tiktokPrivacy)
+								}
+								className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+							>
+								<option value="SELF_ONLY">Only me</option>
+								<option value="MUTUAL_FOLLOW_FRIENDS">Friends</option>
+								<option value="FOLLOWER_OF_CREATOR">Followers</option>
+								<option value="PUBLIC_TO_EVERYONE">Everyone</option>
+							</select>
+						</div>
+						<div className="flex justify-end gap-2">
+							<Button
+								variant="outline"
+								onClick={() => setShowTikTokDialog(false)}
+							>
+								Cancel
+							</Button>
+							<Button
+								onClick={() =>
+									doShare("tiktok", {
+										caption: tiktokCaption,
+										privacyLevel: tiktokPrivacy,
+									})
+								}
+								disabled={sharing === "tiktok"}
+							>
+								{sharing === "tiktok" ? (
+									<Loader2 className="h-4 w-4 animate-spin" />
+								) : (
+									"Upload to TikTok"
 								)}
 							</Button>
 						</div>

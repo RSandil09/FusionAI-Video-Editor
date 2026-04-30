@@ -1,4 +1,4 @@
-import type { IDisplay, IMetadata, ITrim } from "@designcombo/types";
+﻿import type { IDisplay, IMetadata, ITrim } from "@designcombo/types";
 import { BaseItem, BaseItemOptions } from "./base-item";
 import ThumbnailCache from "../../../utils/thumbnail-cache";
 import { timeMsToUnits, unitsToTimeMs } from "../types";
@@ -77,7 +77,7 @@ export class VideoItem extends BaseItem {
 	private async prepareAssets() {
 		if (typeof window === "undefined") return;
 		try {
-			// Use /api/video-stream (streaming proxy) — NOT /api/video-proxy (redirect).
+			// Use /api/video-stream (streaming proxy) â€” NOT /api/video-proxy (redirect).
 			// getFileFromUrl() needs to read the full response body, which requires a
 			// same-origin response. The redirect proxy sends the browser cross-origin
 			// to R2, where CORS headers on the bucket are required. The streaming proxy
@@ -235,7 +235,7 @@ export class VideoItem extends BaseItem {
 	}
 
 	private calcVisibleWidth() {
-		const canvasEl = document.getElementById("designcombo-timeline-canvas");
+		const canvasEl = document.getElementById("fusion-timeline-canvas");
 		const cw = canvasEl?.clientWidth ?? 0;
 		const visible = Math.min(cw - this.left - this.scrollLeft, cw);
 		const cutRight = Math.max(

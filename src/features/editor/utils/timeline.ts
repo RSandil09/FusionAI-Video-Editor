@@ -1,4 +1,4 @@
-import { findIndex } from "./search";
+﻿import { findIndex } from "./search";
 import {
 	FRAME_INTERVAL,
 	PREVIEW_FRAME_WIDTH,
@@ -95,7 +95,7 @@ export function getFitZoomLevel(
 		const clampedScrollOffset = Math.max(0, scrollOffset);
 
 		const timelineCanvas = document.getElementById(
-			"designcombo-timeline-canvas",
+			"fusion-timeline-canvas",
 		) as HTMLElement;
 		const offsetWidth =
 			timelineCanvas?.offsetWidth ?? document.body.offsetWidth;
