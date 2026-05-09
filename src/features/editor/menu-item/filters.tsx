@@ -139,7 +139,8 @@ export const Filters = () => {
 			)}
 
 			{hasSelection && (
-				<ScrollArea className="flex-1">
+				<div className="flex-1 min-h-0 relative">
+				<ScrollArea className="absolute inset-0">
 					<div className="px-4 pb-4 space-y-4">
 						{FILTER_CATEGORIES.map((cat) => {
 							const items = FILTER_PRESETS.filter(
@@ -166,6 +167,7 @@ export const Filters = () => {
 						})}
 					</div>
 				</ScrollArea>
+				</div>
 			)}
 		</div>
 	);
