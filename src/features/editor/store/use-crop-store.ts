@@ -1,5 +1,19 @@
 import { create } from "zustand";
 
+// Mirror the same proxy logic used by player/items/video.tsx and image.tsx.
+// The crop store creates elements with crossOrigin="anonymous" so the canvas
+// draw doesn't taint. That mode requires the server to return CORS headers —
+// direct R2 URLs don't, so we route through the same proxy routes the player uses.
+function proxyMediaSrc(src: string, type: "video" | "image"): string {
+	if (!src) return src;
+	if (src.includes("/api/video-proxy") || src.includes("/api/image-proxy")) return src;
+	if (src.includes(".r2.dev")) {
+		const route = type === "video" ? "/api/video-proxy" : "/api/image-proxy";
+		return `${route}?url=${encodeURIComponent(src)}`;
+	}
+	return src;
+}
+
 type Area = [x: number, y: number, width: number, height: number];
 
 interface ICropState {
@@ -58,40 +72,37 @@ const useCropStore = create<ICropState>((set) => ({
 	setArea: (area: Area) => set({ area }),
 	setStep: (step: number) => set({ step }),
 	loadImage: (src: string) => {
+		const proxied = proxyMediaSrc(src, "image");
 		const image = document.createElement("img");
-		image.setAttribute("crossOrigin", "anonymous");
-		image.setAttribute("src", src);
+		image.crossOrigin = "anonymous";
+		// Attach listener BEFORE setting src to avoid a race on cached responses
 		image.addEventListener("load", () => {
 			const imageWidth = image.naturalWidth;
 			const imageHeight = image.naturalHeight;
 			const maxWidth = 700;
 			const maxHeight = 520;
-
-			// Calculate the scale factors for width and height
 			const widthScale = maxWidth / imageWidth;
 			const heightScale = maxHeight / imageHeight;
-
-			// Choose the smaller scale factor to fit within both dimensions
 			const scaleFactor = Math.min(widthScale, heightScale);
 			set({
 				area: [0, 0, imageWidth * scaleFactor, imageHeight * scaleFactor],
 				src,
 				size: { width: imageWidth, height: imageHeight },
+				element: image,
+				scale: scaleFactor,
 			});
-			set({ element: image, scale: scaleFactor });
 		});
-		image.src = src;
+		image.src = proxied;
 	},
 	loadVideo: (src: string) => {
 		set({ area: [0, 0, 0, 0], src });
 
+		const proxied = proxyMediaSrc(src, "video");
 		const video = document.createElement("video");
 
 		video.setAttribute("playsinline", "");
 		video.preload = "metadata";
 		video.autoplay = false;
-
-		// Required when using a Service Worker on iOS Safari.
 		video.crossOrigin = "anonymous";
 
 		video.addEventListener("loadedmetadata", () => {
@@ -143,7 +154,7 @@ const useCropStore = create<ICropState>((set) => ({
 			}
 		});
 
-		video.src = src;
+		video.src = proxied;
 	},
 }));
 
