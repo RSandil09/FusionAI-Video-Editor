@@ -11,14 +11,7 @@ import {
 import useStore from "../store/use-store";
 import { cn } from "@/lib/utils";
 
-// A neutral reference swatch — mid-tone gradient the filter will visually affect
-const SWATCH_STYLE: React.CSSProperties = {
-	width: "100%",
-	aspectRatio: "4 / 3",
-	borderRadius: "6px",
-	background:
-		"linear-gradient(135deg, #8a9bb0 0%, #b0a090 50%, #9aaa8a 100%)",
-};
+const PREVIEW_SRC = "/images/images.jpg";
 
 const FilterCard = ({
 	preset,
@@ -38,17 +31,46 @@ const FilterCard = ({
 			onClick={() => onSelect(preset)}
 			onKeyDown={(e) => e.key === "Enter" && onSelect(preset)}
 			className={cn(
-				"flex flex-col gap-1 cursor-pointer rounded-lg p-1.5 border-2 transition-all duration-150",
+				"flex flex-col gap-1.5 cursor-pointer rounded-lg p-1 transition-all duration-150 select-none group",
 				isActive
-					? "border-primary bg-primary/10"
-					: "border-transparent hover:border-border/60 hover:bg-muted/40",
+					? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+					: "ring-1 ring-transparent hover:ring-border/50",
 			)}
 		>
-			<div style={{ ...SWATCH_STYLE, filter: filterCss }} />
+			{/* Thumbnail */}
+			<div className="relative overflow-hidden rounded-[5px] aspect-square bg-muted/30">
+				<img
+					src={PREVIEW_SRC}
+					alt={preset.name}
+					draggable={false}
+					className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+					style={{ filter: filterCss, display: "block" }}
+				/>
+				{/* Active checkmark badge */}
+				{isActive && (
+					<div className="absolute bottom-1 right-1 bg-primary rounded-full w-4 h-4 flex items-center justify-center shadow-sm">
+						<svg
+							className="w-2.5 h-2.5 text-white"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							strokeWidth={3}
+						>
+							<path
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								d="M5 13l4 4L19 7"
+							/>
+						</svg>
+					</div>
+				)}
+			</div>
+
+			{/* Label */}
 			<span
 				className={cn(
-					"text-[11px] text-center truncate leading-snug",
-					isActive ? "text-primary font-medium" : "text-muted-foreground",
+					"text-[10px] text-center truncate leading-none pb-0.5 px-0.5",
+					isActive ? "text-primary font-semibold" : "text-muted-foreground",
 				)}
 			>
 				{preset.name}
