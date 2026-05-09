@@ -21,7 +21,6 @@ const RATE_WINDOW_MS = 60 * 60 * 1000;
  * Request body:
  * {
  *   name: string,
- *   orientation: "portrait" | "landscape",
  *   fps?: 30 | 60,
  *   userPrompt?: string,          ← free-text editing instruction
  *   assets: Array<{
@@ -60,7 +59,6 @@ export async function POST(request: NextRequest) {
     // 2. Parse + validate body
     let body: {
       name?: string;
-      orientation?: "portrait" | "landscape";
       fps?: number;
       userPrompt?: string;
       assets?: AssetInput[];
@@ -73,7 +71,6 @@ export async function POST(request: NextRequest) {
 
     const {
       name,
-      orientation = "portrait",
       fps = 30,
       userPrompt = "",
       assets = [],
@@ -82,14 +79,6 @@ export async function POST(request: NextRequest) {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json(
         { error: "name is required and must be a non-empty string" },
-        { status: 400 },
-      );
-    }
-
-    const validOrientations = ["portrait", "landscape"];
-    if (!validOrientations.includes(orientation)) {
-      return NextResponse.json(
-        { error: "orientation must be 'portrait' or 'landscape'" },
         { status: 400 },
       );
     }
@@ -116,11 +105,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Determine canvas size
-    const size =
-      orientation === "portrait"
-        ? { width: 1080, height: 1920 }
-        : { width: 1920, height: 1080 };
+    // 3. Canvas size — portrait only (1080×1920)
+    const size = { width: 1080, height: 1920 };
 
     // 4. Parse user intent (text-only Gemini call — fast, ~1-2s)
     //    This runs before any video processing so the intent is available

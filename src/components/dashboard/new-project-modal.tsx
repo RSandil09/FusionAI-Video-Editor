@@ -8,13 +8,10 @@ import { uploadFile as uploadFileToR2 } from "@/lib/upload-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Orientation = "portrait" | "landscape";
-
 // Step 1 = name + upload
 // Step 2 = AI prompt
-// Step 3 = orientation
-// Step 4 = generating
-type Step = 1 | 2 | 3 | 4;
+// Step 3 = generating
+type Step = 1 | 2 | 3;
 
 interface UploadedAsset {
   preview: string;
@@ -208,10 +205,7 @@ export default function NewProjectModal({
   // Step 2 — prompt
   const [userPrompt, setUserPrompt] = useState("");
 
-  // Step 3 — orientation
-  const [orientation, setOrientation] = useState<Orientation>("portrait");
-
-  // Step 4 — generating
+  // Step 3 — generating
   const [loadingStep, setLoadingStep] = useState(0);
 
   // AI name suggestions
@@ -221,12 +215,11 @@ export default function NewProjectModal({
 
   // ── Reset on close ────────────────────────────────────────────────────────
   const handleClose = () => {
-    if (step === 4) return;
+    if (step === 3) return;
     setStep(1);
     setProjectName("");
     setAssets([]);
     setUserPrompt("");
-    setOrientation("portrait");
     setLoadingStep(0);
     setNameSuggestions([]);
     onClose();
@@ -368,7 +361,7 @@ export default function NewProjectModal({
   const canProceedToStep2 = projectName.trim().length > 0;
 
   const handleGenerate = async () => {
-    setStep(4);
+    setStep(3);
     setLoadingStep(0);
 
     const loadingSteps = buildLoadingSteps(userPrompt.trim().length > 0);
@@ -397,7 +390,6 @@ export default function NewProjectModal({
         },
         body: JSON.stringify({
           name: projectName.trim(),
-          orientation,
           fps: 30,
           userPrompt: userPrompt.trim(),
           assets: doneAssets,
@@ -417,7 +409,7 @@ export default function NewProjectModal({
       clearInterval(interval);
       const msg = err instanceof Error ? err.message : "Something went wrong";
       toast.error(`Failed to create project: ${msg}`);
-      setStep(3); // back to orientation so user can retry
+      setStep(2); // back to prompt so user can retry
     }
   };
 
@@ -427,12 +419,11 @@ export default function NewProjectModal({
   const stepLabels: Record<Step, string> = {
     1: "New Project",
     2: "Tell the AI what you need",
-    3: "Choose Orientation",
-    4: "Building Your Timeline…",
+    3: "Building Your Timeline…",
   };
 
-  // User-visible step number (step 4 is not a numbered user step)
-  const visibleStepNum = step <= 3 ? step : null;
+  // User-visible step number (step 3 is the generating screen, not numbered)
+  const visibleStepNum = step <= 2 ? step : null;
 
   const loadingSteps = buildLoadingSteps(userPrompt.trim().length > 0);
 
@@ -455,11 +446,11 @@ export default function NewProjectModal({
             </h2>
             {visibleStepNum !== null && (
               <p className="text-white/40 text-xs mt-0.5">
-                Step {visibleStepNum} of 3
+                Step {visibleStepNum} of 2
               </p>
             )}
           </div>
-          {step !== 4 && (
+          {step !== 3 && (
             <button
               onClick={handleClose}
               className="text-white/40 hover:text-white transition-colors text-xl leading-none"
@@ -708,106 +699,29 @@ export default function NewProjectModal({
               <div className="flex items-center gap-3">
                 {userPrompt.trim().length === 0 && (
                   <button
-                    onClick={() => setStep(3)}
+                    onClick={handleGenerate}
                     className="text-white/35 text-sm hover:text-white/60 transition-colors"
                   >
                     Skip
                   </button>
                 )}
                 <button
-                  onClick={() => setStep(3)}
-                  className="px-5 py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors"
+                  onClick={handleGenerate}
+                  className="px-5 py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
                 >
-                  {userPrompt.trim().length > 0 ? "Use this prompt →" : "Continue →"}
+                  {userPrompt.trim().length > 0 ? (
+                    <><span>✨</span> Create project</>
+                  ) : (
+                    "Create project →"
+                  )}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── Step 3: Orientation ───────────────────────────────────────── */}
+        {/* ── Step 3: Generating ────────────────────────────────────────── */}
         {step === 3 && (
-          <div className="px-6 py-5 space-y-5">
-            <p className="text-white/50 text-sm">
-              Choose the format for your project. You can&apos;t change this later.
-            </p>
-
-            {/* Show active prompt reminder */}
-            {userPrompt.trim().length > 0 && (
-              <div className="flex items-start gap-2 bg-white/[0.04] border border-white/8 rounded-xl px-4 py-3">
-                <span className="text-sm flex-shrink-0">✨</span>
-                <p className="text-white/40 text-xs leading-relaxed line-clamp-2">
-                  <span className="text-white/55 font-medium">Prompt: </span>
-                  {userPrompt}
-                </p>
-                <button
-                  onClick={() => setStep(2)}
-                  className="text-white/25 hover:text-white/50 text-xs ml-auto flex-shrink-0 transition-colors"
-                >
-                  Edit
-                </button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  {
-                    value: "portrait",
-                    label: "Portrait",
-                    sub: "9:16 · 1080×1920",
-                    icon: (
-                      <div className="w-8 h-12 rounded-md border-2 border-current" />
-                    ),
-                  },
-                  {
-                    value: "landscape",
-                    label: "Landscape",
-                    sub: "16:9 · 1920×1080",
-                    icon: (
-                      <div className="w-12 h-8 rounded-md border-2 border-current" />
-                    ),
-                  },
-                ] as const
-              ).map(({ value, label, sub, icon }) => (
-                <button
-                  key={value}
-                  onClick={() => setOrientation(value)}
-                  className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all ${
-                    orientation === value
-                      ? "border-white bg-white/10 text-white"
-                      : "border-white/15 bg-white/[0.02] text-white/40 hover:border-white/30 hover:text-white/60"
-                  }`}
-                >
-                  {icon}
-                  <div className="text-center">
-                    <p className="text-sm font-medium">{label}</p>
-                    <p className="text-xs opacity-60 mt-0.5">{sub}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex justify-between items-center pt-1">
-              <button
-                onClick={() => setStep(2)}
-                className="px-4 py-2.5 rounded-lg text-white/50 text-sm hover:text-white transition-colors"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={handleGenerate}
-                className="px-5 py-2.5 rounded-lg bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
-              >
-                <span>✨</span>
-                Create project
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 4: Generating ────────────────────────────────────────── */}
-        {step === 4 && (
           <div className="px-6 py-10 flex flex-col items-center gap-6">
             {/* Spinner */}
             <div className="relative w-16 h-16">
