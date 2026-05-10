@@ -1,7 +1,7 @@
 ﻿import { ISize, ITrackItem } from "@designcombo/types";
 import { AbsoluteFill, Sequence } from "remotion";
 import { calculateFrames } from "../utils/frames";
-import { calculateContainerStyles } from "./styles";
+import { buildFilter, calculateContainerStyles } from "./styles";
 import { TransitionSeries } from "@designcombo/transitions";
 
 export interface SequenceItemOptions {
@@ -50,6 +50,11 @@ export const BaseSequence = ({
 				? details?.background
 				: "transparent";
 
+	// video/image apply filter directly on the media element for Lambda reliability.
+	// All other types (text, shape, caption, etc.) get the filter here at the container level.
+	const MEDIA_TYPES = new Set(["video", "image"]);
+	const containerFilter = MEDIA_TYPES.has(item.type) ? "none" : buildFilter(details);
+
 	if (isTransition) {
 		return (
 			<TransitionSeries.Sequence
@@ -61,7 +66,7 @@ export const BaseSequence = ({
 					id={item.id}
 					data-track-item="transition-element"
 					className={`fusion-scene-item id-${item.id} fusion-scene-item-type-${item.type}`}
-					style={calculateContainerStyles(details, crop, { background })}
+					style={calculateContainerStyles(details, crop, { background, filter: containerFilter })}
 				>
 					{children}
 				</AbsoluteFill>
@@ -87,6 +92,7 @@ export const BaseSequence = ({
 					crop,
 					{
 						background,
+						filter: containerFilter,
 						pointerEvents: item.type === "audio" ? "none" : "auto",
 						overflow:
 							item.type !== "caption" && item.type !== "text"

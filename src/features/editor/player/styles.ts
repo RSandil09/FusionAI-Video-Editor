@@ -56,7 +56,7 @@ export const calculateTextStyles = (
 	borderRadius: `${Math.min(details.width, details.height) * ((details.borderRadius || 0) / 100)}px`,
 });
 
-function buildFilter(details: ITrackItem["details"]): string {
+export function buildFilter(details: ITrackItem["details"]): string {
 	const d = details as any;
 	const brightness = d.brightness ?? 100;
 	const blur = d.blur ?? 0;
@@ -106,7 +106,6 @@ export const calculateContainerStyles = (
 				: crop.height || details.height || "max-content",
 		opacity: details.opacity !== undefined ? details.opacity / 100 : 1,
 		transformOrigin: details.transformOrigin || "center center",
-		filter: buildFilter(details),
 		transform: buildTransform(details),
 		...overrides, // Merge overrides into the calculated styles
 	};

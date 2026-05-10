@@ -1,7 +1,7 @@
 import { IVideo } from "@designcombo/types";
 import { BaseSequence, SequenceItemOptions } from "../base-sequence";
 import { BoxAnim, ContentAnim, MaskAnim } from "@designcombo/animations";
-import { calculateContainerStyles, calculateMediaStyles } from "../styles";
+import { buildFilter, calculateContainerStyles, calculateMediaStyles } from "../styles";
 import { getAnimations } from "../../utils/get-animations";
 import { calculateFrames } from "../../utils/frames";
 import { Video as RemotionVideo, OffthreadVideo, getRemotionEnvironment } from "remotion";
@@ -71,10 +71,13 @@ export const Video = ({
 		? (trimEndMs / 1000) * fps
 		: (displayDurationMs / 1000 / playbackRate) * fps;
 
+	const filterCss = buildFilter(details);
+
 	const children = (
 		<BoxAnim
 			style={calculateContainerStyles(details, crop, {
 				overflow: "hidden",
+				filter: "none",
 			})}
 			animationIn={animationIn}
 			animationOut={animationOut}
@@ -101,6 +104,7 @@ export const Video = ({
 								playbackRate={playbackRate}
 								src={videoSrc}
 								volume={muteAudio ? 0 : (details.volume || 0) / 100}
+								style={{ filter: filterCss }}
 							/>
 						) : (
 							<RemotionVideo
@@ -109,6 +113,7 @@ export const Video = ({
 								playbackRate={playbackRate}
 								src={videoSrc}
 								volume={muteAudio ? 0 : (details.volume || 0) / 100}
+								style={{ filter: filterCss }}
 								onError={(e) => {
 									console.error("Video playback error:", e, "URL:", videoSrc);
 								}}

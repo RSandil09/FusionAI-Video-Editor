@@ -1,7 +1,7 @@
 import { IImage } from "@designcombo/types";
 import { BaseSequence, SequenceItemOptions } from "../base-sequence";
 import { BoxAnim, ContentAnim, MaskAnim } from "@designcombo/animations";
-import { calculateContainerStyles, calculateMediaStyles } from "../styles";
+import { buildFilter, calculateContainerStyles, calculateMediaStyles } from "../styles";
 import { getAnimations } from "../../utils/get-animations";
 import { calculateFrames } from "../../utils/frames";
 import { Img } from "remotion";
@@ -61,10 +61,13 @@ export default function Image({
 	// Ensure image URL is proxied for CORS
 	const imageSrc = ensureProxiedUrl(details.src);
 
+	const filterCss = buildFilter(details);
+
 	const children = (
 		<BoxAnim
 			style={calculateContainerStyles(details, crop, {
 				transform: "scale(1)",
+				filter: "none",
 			})}
 			animationIn={animationIn!}
 			animationOut={animationOut!}
@@ -85,7 +88,7 @@ export default function Image({
 						id={`${item.id}-reveal-mask`}
 						style={calculateMediaStyles(details, crop)}
 					>
-						<Img data-id={item.id} src={imageSrc} />
+						<Img data-id={item.id} src={imageSrc} style={{ filter: filterCss }} />
 					</div>
 				</MaskAnim>
 			</ContentAnim>
