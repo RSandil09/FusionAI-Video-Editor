@@ -50,8 +50,9 @@ export const BaseSequence = ({
 				? details?.background
 				: "transparent";
 
-	// video/image apply filter directly on the media element for Lambda reliability.
-	// All other types (text, shape, caption, etc.) get the filter here at the container level.
+	// video/image: filter is applied directly on the media element (CSS filter on a
+	// parent div does not cascade to <video> in Chrome due to GPU compositing).
+	// All other types get the filter here at the container level.
 	const MEDIA_TYPES = new Set(["video", "image"]);
 	const containerFilter = MEDIA_TYPES.has(item.type) ? "none" : buildFilter(details);
 
