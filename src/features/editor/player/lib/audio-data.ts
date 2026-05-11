@@ -88,7 +88,12 @@ export class AudioDataManager {
 		);
 
 		this.items = items;
-		this.frameCache.clear(); // Clear frame cache when items change
+		// Only invalidate the frame-visualization cache when the item set actually
+		// changed. Trim/volume/position updates go through updateItem and do NOT
+		// need to blow away the whole cache.
+		if (addItemIds.length > 0 || removeItemIds.length > 0) {
+			this.frameCache.clear();
+		}
 	}
 
 	public validateUpdateItems(
@@ -113,12 +118,15 @@ export class AudioDataManager {
 			if (item.id === newItem.id) {
 				if (item.details.src !== newItem.details.src) {
 					this.loadAudioData(newItem.details.src, item.id).catch(console.error);
+					// Audio source changed — cached visualizations are stale.
+					this.frameCache.clear();
 				}
 				return newItem;
 			}
 			return item;
 		});
-		this.frameCache.clear(); // Clear frame cache when items are updated
+		// No unconditional frameCache.clear() here: trim/volume/position changes
+		// do not affect the waveform data so the cache remains valid.
 	}
 
 	private combineValues = (

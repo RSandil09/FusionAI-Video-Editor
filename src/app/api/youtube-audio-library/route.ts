@@ -75,13 +75,14 @@ export async function GET(request: NextRequest) {
 		const paginatedItems = filtered.slice(startIndex, startIndex + perPage);
 
 		// Map to IAudio-compatible format
-		const baseUrl = request.nextUrl.origin;
 		const audios = paginatedItems.map((item) => {
 			const rawUrl =
 				map[item.id] ||
 				`https://drive.google.com/uc?export=download&id=${item.id}`;
-			// Use video-proxy for CORS-safe playback (supports audio too)
-			const proxiedUrl = `${baseUrl}/api/video-proxy?url=${encodeURIComponent(rawUrl)}`;
+			// Use a relative proxy URL so the src stays valid regardless of which
+			// domain/port the project is loaded on (avoids reload failures when the
+			// project was saved on one origin and opened on another).
+			const proxiedUrl = `/api/video-proxy?url=${encodeURIComponent(rawUrl)}`;
 
 			return {
 				id: `yt-audio-${item.id}`,
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
 			};
 		});
 
-		return NextResponse.json({
+		const responseBody = {
 			audios,
 			total_count: totalCount,
 			page,
@@ -106,6 +107,15 @@ export async function GET(request: NextRequest) {
 			total_pages: totalPages,
 			has_next_page: page < totalPages,
 			has_prev_page: page > 1,
+		};
+
+		return NextResponse.json(responseBody, {
+			headers: {
+				// Allow the browser to serve the list from cache for 5 minutes and
+				// revalidate in the background for up to 1 hour — removes redundant
+				// round-trips every time the Audios panel is opened.
+				"Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
+			},
 		});
 	} catch (error) {
 		logger.error("YouTube Audio Library API error:", error);

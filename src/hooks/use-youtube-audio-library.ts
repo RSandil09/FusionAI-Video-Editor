@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { IAudio } from "@designcombo/types";
 
 interface YouTubeAudioLibraryResponse {
@@ -26,6 +26,24 @@ interface UseYouTubeAudioLibraryReturn {
 	clearAudios: () => void;
 }
 
+// Module-level cache so repeated mounts of the Audios panel skip redundant fetches.
+const responseCache = new Map<string, { data: YouTubeAudioLibraryResponse; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCached(url: string): YouTubeAudioLibraryResponse | null {
+	const entry = responseCache.get(url);
+	if (!entry) return null;
+	if (Date.now() - entry.timestamp > CACHE_TTL) {
+		responseCache.delete(url);
+		return null;
+	}
+	return entry.data;
+}
+
+function setCached(url: string, data: YouTubeAudioLibraryResponse) {
+	responseCache.set(url, { data, timestamp: Date.now() });
+}
+
 /**
  * Hook for fetching and managing YouTube Audio Library tracks.
  * All tracks are royalty-free and safe for YouTube videos and other projects.
@@ -39,12 +57,42 @@ export function useYouTubeAudioLibrary(): UseYouTubeAudioLibraryReturn {
 	const [hasNextPage, setHasNextPage] = useState(false);
 	const [hasPrevPage, setHasPrevPage] = useState(false);
 
-	const fetchAudios = useCallback(async (url: string) => {
+	// Holds the in-flight AbortController so we can cancel stale requests.
+	const abortCtrlRef = useRef<AbortController | null>(null);
+
+	// Cancel any pending fetch when the component unmounts.
+	useEffect(() => {
+		return () => {
+			abortCtrlRef.current?.abort();
+		};
+	}, []);
+
+	const fetchAudios = useCallback(async (url: string, append = false) => {
+		// Serve from cache when available.
+		const cached = getCached(url);
+		if (cached) {
+			if (append) {
+				setAudios((prev) => [...prev, ...cached.audios]);
+			} else {
+				setAudios(cached.audios);
+			}
+			setTotalCount(cached.total_count);
+			setCurrentPage(cached.page);
+			setHasNextPage(cached.has_next_page);
+			setHasPrevPage(cached.has_prev_page);
+			return;
+		}
+
+		// Abort any in-flight request before starting a new one.
+		abortCtrlRef.current?.abort();
+		const ctrl = new AbortController();
+		abortCtrlRef.current = ctrl;
+
 		setLoading(true);
 		setError(null);
 
 		try {
-			const response = await fetch(url);
+			const response = await fetch(url, { signal: ctrl.signal });
 
 			if (!response.ok) {
 				throw new Error(`HTTP error! status: ${response.status}`);
@@ -52,96 +100,51 @@ export function useYouTubeAudioLibrary(): UseYouTubeAudioLibraryReturn {
 
 			const data: YouTubeAudioLibraryResponse = await response.json();
 
-			setAudios(data.audios);
+			setCached(url, data);
+
+			if (append) {
+				setAudios((prev) => [...prev, ...data.audios]);
+			} else {
+				setAudios(data.audios);
+			}
 			setTotalCount(data.total_count);
 			setCurrentPage(data.page);
 			setHasNextPage(data.has_next_page);
 			setHasPrevPage(data.has_prev_page);
 		} catch (err) {
+			if (err instanceof Error && err.name === "AbortError") return;
 			setError(err instanceof Error ? err.message : "Failed to fetch audio");
-			setAudios([]);
+			if (!append) setAudios([]);
 		} finally {
 			setLoading(false);
 		}
 	}, []);
+
+	const buildUrl = (query?: string, page = 1) => {
+		const params = new URLSearchParams({ page: String(page), per_page: "24" });
+		if (query?.trim()) params.set("query", query.trim());
+		return `/api/youtube-audio-library?${params}`;
+	};
 
 	const searchAudios = useCallback(
-		async (query: string, page = 1) => {
-			const params = new URLSearchParams({
-				page: String(page),
-				per_page: "24",
-			});
-			if (query.trim()) params.set("query", query.trim());
-			const url = `/api/youtube-audio-library?${params}`;
-			await fetchAudios(url);
-		},
+		(query: string, page = 1) => fetchAudios(buildUrl(query, page)),
 		[fetchAudios],
 	);
 
-	const searchAudiosAppend = useCallback(async (query: string, page = 1) => {
-		setLoading(true);
-		setError(null);
-
-		try {
-			const params = new URLSearchParams({
-				page: String(page),
-				per_page: "24",
-			});
-			if (query.trim()) params.set("query", query.trim());
-			const url = `/api/youtube-audio-library?${params}`;
-			const response = await fetch(url);
-
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
-			}
-
-			const data: YouTubeAudioLibraryResponse = await response.json();
-
-			setAudios((prev) => [...prev, ...data.audios]);
-			setTotalCount(data.total_count);
-			setCurrentPage(data.page);
-			setHasNextPage(data.has_next_page);
-			setHasPrevPage(data.has_prev_page);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to fetch audio");
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+	const searchAudiosAppend = useCallback(
+		(query: string, page = 1) => fetchAudios(buildUrl(query, page), true),
+		[fetchAudios],
+	);
 
 	const loadAudios = useCallback(
-		async (page = 1) => {
-			const url = `/api/youtube-audio-library?page=${page}&per_page=24`;
-			await fetchAudios(url);
-		},
+		(page = 1) => fetchAudios(buildUrl(undefined, page)),
 		[fetchAudios],
 	);
 
-	const loadAudiosAppend = useCallback(async (page = 1) => {
-		setLoading(true);
-		setError(null);
-
-		try {
-			const url = `/api/youtube-audio-library?page=${page}&per_page=24`;
-			const response = await fetch(url);
-
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
-			}
-
-			const data: YouTubeAudioLibraryResponse = await response.json();
-
-			setAudios((prev) => [...prev, ...data.audios]);
-			setTotalCount(data.total_count);
-			setCurrentPage(data.page);
-			setHasNextPage(data.has_next_page);
-			setHasPrevPage(data.has_prev_page);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to fetch audio");
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+	const loadAudiosAppend = useCallback(
+		(page = 1) => fetchAudios(buildUrl(undefined, page), true),
+		[fetchAudios],
+	);
 
 	const clearAudios = useCallback(() => {
 		setAudios([]);

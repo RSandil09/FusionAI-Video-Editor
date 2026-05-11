@@ -53,13 +53,29 @@ export const VoiceOver = () => {
 			const { agent } = await res.json();
 			if (!agent?.url) throw new Error("No audio URL returned.");
 
+			const proxiedSrc = `/api/video-proxy?url=${encodeURIComponent(agent.url)}`;
+
+			// Pre-fetch duration so the timeline item appears at the correct length.
+			const durationMs = agent.duration
+				? Math.round(agent.duration * 1000)
+				: await new Promise<number>((resolve) => {
+						const audio = document.createElement("audio");
+						audio.preload = "metadata";
+						const timer = setTimeout(() => { audio.src = ""; resolve(0); }, 5000);
+						audio.onloadedmetadata = () => {
+							clearTimeout(timer);
+							resolve(isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0);
+							audio.src = "";
+						};
+						audio.onerror = () => { clearTimeout(timer); resolve(0); };
+						audio.src = proxiedSrc;
+					});
+
 			dispatch(ADD_AUDIO, {
 				payload: {
-					details: {
-						src: agent.url,
-						volume: 100,
-					},
+					details: { src: proxiedSrc, volume: 100 },
 					name: "Voice Over",
+					...(durationMs > 0 && { duration: durationMs }),
 				},
 				options: {},
 			});

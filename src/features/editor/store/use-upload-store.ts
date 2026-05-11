@@ -98,35 +98,33 @@ export const useUploadStore = create<UploadStore>()((set, get) => ({
 		const { uploads } = get();
 		const pending = uploads.filter((u) => u.status === "pending");
 
-		for (const upload of pending) {
-			// Mark as uploading
-			get().updateStatus(upload.id, "uploading");
+		await Promise.all(
+			pending.map(async (upload) => {
+				get().updateStatus(upload.id, "uploading");
 
-			try {
-				let result: UploadResult;
+				try {
+					let result: UploadResult;
 
-				if (upload.file) {
-					// File upload
-					result = await uploadFile(upload.file, (progress) => {
-						get().updateProgress(upload.id, progress.percentage);
-					});
-				} else if (upload.url) {
-					// URL import
-					result = await importFromUrl(upload.url);
-					get().updateProgress(upload.id, 100);
-				} else {
-					throw new Error("Upload must have file or URL");
+					if (upload.file) {
+						result = await uploadFile(upload.file, (progress) => {
+							get().updateProgress(upload.id, progress.percentage);
+						});
+					} else if (upload.url) {
+						result = await importFromUrl(upload.url);
+						get().updateProgress(upload.id, 100);
+					} else {
+						throw new Error("Upload must have file or URL");
+					}
+
+					get().updateStatus(upload.id, "uploaded", undefined, result);
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : "Upload failed";
+					get().updateStatus(upload.id, "failed", errorMessage);
+					console.error("Upload failed:", error);
 				}
-
-				// Mark as uploaded
-				get().updateStatus(upload.id, "uploaded", undefined, result);
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : "Upload failed";
-				get().updateStatus(upload.id, "failed", errorMessage);
-				console.error("Upload failed:", error);
-			}
-		}
+			}),
+		);
 	},
 
 	loadUserAssets: async () => {
