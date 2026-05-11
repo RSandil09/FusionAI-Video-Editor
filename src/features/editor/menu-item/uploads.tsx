@@ -210,39 +210,78 @@ export const Uploads = () => {
 		});
 	};
 
-	const handleAddImage = (upload: any) => {
-		const src = upload.result?.url || upload.url;
-		if (!src) {
+	const handleAddImage = async (upload: any) => {
+		const rawSrc = upload.result?.url || upload.url;
+		if (!rawSrc) {
 			console.warn("⚠️ No src found for image upload");
 			return;
 		}
-		const payload = {
-			id: generateId(),
-			type: "image",
-			display: { from: 0, to: 5000 },
-			details: { src },
-			metadata: {},
-		};
+
+		// Strip proxy prefix → direct R2 URL.
+		// @designcombo/state uses crossOrigin="anonymous" internally; when details.src
+		// is a proxy URL, the CORS redirect changes Origin to null, which R2 rejects.
+		let src = rawSrc;
+		if (src.startsWith("/api/image-proxy?url=")) {
+			src = decodeURIComponent(src.slice("/api/image-proxy?url=".length));
+		} else if (src.startsWith("/api/video-proxy?url=")) {
+			src = decodeURIComponent(src.slice("/api/video-proxy?url=".length));
+		}
+
+		// Pre-fetch dimensions using a plain <img> (no crossOrigin → no CORS needed)
+		// so the library skips its own crossOrigin="anonymous" measurement.
+		let width: number | undefined;
+		let height: number | undefined;
+		try {
+			({ width, height } = await new Promise<{ width: number; height: number }>(
+				(resolve, reject) => {
+					const img = document.createElement("img");
+					const timer = setTimeout(() => reject(new Error("timeout")), 5000);
+					img.onload = () => {
+						clearTimeout(timer);
+						resolve({ width: img.naturalWidth, height: img.naturalHeight });
+					};
+					img.onerror = () => { clearTimeout(timer); reject(new Error("error")); };
+					img.src = src;
+				},
+			));
+		} catch {
+			// Fallback: dispatch without dimensions; library will use defaults.
+		}
+
 		dispatch(ADD_IMAGE, {
-			payload,
+			payload: {
+				id: generateId(),
+				type: "image",
+				display: { from: 0, to: 5000 },
+				details: { src, ...(width && height ? { width, height } : {}) },
+				metadata: {},
+			},
 			options: {},
 		});
 	};
 
 	const handleAddAudio = (upload: any) => {
-		const src = upload.result?.url || upload.url;
-		if (!src) {
+		const rawSrc = upload.result?.url || upload.url;
+		if (!rawSrc) {
 			console.warn("⚠️ No src found for audio upload");
 			return;
 		}
-		const payload = {
-			id: generateId(),
-			type: "audio",
-			details: { src },
-			metadata: {},
-		};
+
+		// Strip proxy prefix → direct R2 URL (same reason as handleAddImage above).
+		let src = rawSrc;
+		if (src.startsWith("/api/image-proxy?url=")) {
+			src = decodeURIComponent(src.slice("/api/image-proxy?url=".length));
+		} else if (src.startsWith("/api/video-proxy?url=")) {
+			src = decodeURIComponent(src.slice("/api/video-proxy?url=".length));
+		}
+
 		dispatch(ADD_AUDIO, {
-			payload,
+			payload: {
+				id: generateId(),
+				type: "audio",
+				details: { src },
+				metadata: {},
+			},
 			options: {},
 		});
 	};

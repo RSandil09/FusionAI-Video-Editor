@@ -37,6 +37,20 @@ export const Audios = () => {
 
 	const handleAddAudio = (payload: Partial<IAudio>) => {
 		payload.id = generateId();
+
+		// Strip proxy prefix so details.src is the direct URL.
+		// @designcombo/state uses crossOrigin="anonymous" internally; a proxy URL
+		// causes a CORS redirect that changes Origin to null, which CDNs reject.
+		if (payload.details?.src) {
+			let src = payload.details.src;
+			if (src.startsWith("/api/video-proxy?url=")) {
+				src = decodeURIComponent(src.slice("/api/video-proxy?url=".length));
+			} else if (src.startsWith("/api/image-proxy?url=")) {
+				src = decodeURIComponent(src.slice("/api/image-proxy?url=".length));
+			}
+			payload.details = { ...payload.details, src };
+		}
+
 		dispatch(ADD_AUDIO, {
 			payload,
 			options: {},
