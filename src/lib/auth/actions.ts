@@ -198,14 +198,23 @@ export async function signOut(): Promise<void> {
  * Send password reset email
  */
 export async function sendPasswordReset(email: string): Promise<void> {
-	const auth = getFirebaseAuth();
-
 	try {
-		await sendPasswordResetEmail(auth, email);
+		const res = await fetch("/api/auth/forgot-password", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ email }),
+		});
+
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || "Failed to send reset email");
+		}
+
 		logger.log("✅ Password reset email sent to:", email);
 	} catch (error) {
 		logger.error("Password reset error:", error);
-		throw formatAuthError(error);
+		if (error instanceof Error) throw error;
+		throw new Error("Failed to send reset email. Please try again.");
 	}
 }
 
