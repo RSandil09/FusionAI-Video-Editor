@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import { getFirebaseAdmin } from "@/lib/auth/server";
+import { getAuth } from "@/lib/auth/server";
 
 export async function POST(request: Request) {
 	try {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
 		// Generate the reset link via Firebase Admin — same link Firebase would send,
 		// but we deliver it via our own SMTP instead of Firebase's default sender.
-		const { auth } = getFirebaseAdmin();
+		const auth = getAuth();
 		let resetLink: string;
 		try {
 			resetLink = await auth.generatePasswordResetLink(email);
