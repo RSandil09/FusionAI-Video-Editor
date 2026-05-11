@@ -35,28 +35,8 @@ export const Audios = () => {
 		loadAudios();
 	}, [loadAudios]);
 
-	const handleAddAudio = async (payload: Partial<IAudio>) => {
+	const handleAddAudio = (payload: Partial<IAudio>) => {
 		payload.id = generateId();
-
-		// Pre-fetch duration so the timeline item appears at the correct length
-		// immediately. Resolves to 0 on error/timeout so ADD_AUDIO is never blocked.
-		const src = payload.details?.src;
-		if (src && !payload.duration) {
-			const durationMs = await new Promise<number>((resolve) => {
-				const audio = document.createElement("audio");
-				audio.preload = "metadata";
-				const timer = setTimeout(() => { audio.src = ""; resolve(0); }, 5000);
-				audio.onloadedmetadata = () => {
-					clearTimeout(timer);
-					resolve(isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0);
-					audio.src = "";
-				};
-				audio.onerror = () => { clearTimeout(timer); resolve(0); };
-				audio.src = src;
-			});
-			if (durationMs > 0) payload.duration = durationMs;
-		}
-
 		dispatch(ADD_AUDIO, {
 			payload,
 			options: {},

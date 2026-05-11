@@ -51,25 +51,7 @@ const useDragAndDrop = (onDragStateChange?: (isDragging: boolean) => void) => {
 				});
 				break;
 			case AcceptedDropTypes.AUDIO: {
-				const src = (payload.details as { src?: string })?.src;
-				const dispatchAudio = (durationMs = 0) => {
-					if (durationMs > 0) payload.duration = durationMs;
-					dispatch(ADD_AUDIO, { payload });
-				};
-				if (src && !payload.duration) {
-					const audio = document.createElement("audio");
-					audio.preload = "metadata";
-					const timer = setTimeout(() => { audio.src = ""; dispatchAudio(0); }, 5000);
-					audio.onloadedmetadata = () => {
-						clearTimeout(timer);
-						dispatchAudio(isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0);
-						audio.src = "";
-					};
-					audio.onerror = () => { clearTimeout(timer); dispatchAudio(0); };
-					audio.src = src;
-				} else {
-					dispatchAudio();
-				}
+				dispatch(ADD_AUDIO, { payload });
 				break;
 			}
 		}

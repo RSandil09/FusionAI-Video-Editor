@@ -140,29 +140,6 @@ export const Uploads = () => {
 
 	// ── helpers ─────────────────────────────────────────────────────────────────
 
-	// Pre-fetch audio duration so the timeline item has the correct length immediately.
-	// Resolves with 0 on timeout (5 s) or error so ADD_AUDIO is never blocked.
-	const getAudioDuration = (src: string): Promise<number> =>
-		new Promise((resolve) => {
-			const audio = document.createElement("audio");
-			audio.preload = "metadata";
-			const timer = setTimeout(() => {
-				audio.src = "";
-				resolve(0);
-			}, 5000);
-			audio.onloadedmetadata = () => {
-				clearTimeout(timer);
-				resolve(audio.duration * 1000); // convert to ms
-				audio.src = "";
-			};
-			audio.onerror = () => {
-				clearTimeout(timer);
-				resolve(0);
-			};
-			audio.src = src;
-			audio.load();
-		});
-
 	/**
 	 * Load video metadata without crossOrigin="anonymous".
 	 *
@@ -252,18 +229,16 @@ export const Uploads = () => {
 		});
 	};
 
-	const handleAddAudio = async (upload: any) => {
+	const handleAddAudio = (upload: any) => {
 		const src = upload.result?.url || upload.url;
 		if (!src) {
 			console.warn("⚠️ No src found for audio upload");
 			return;
 		}
-		const duration = await getAudioDuration(src);
 		const payload = {
 			id: generateId(),
 			type: "audio",
 			details: { src },
-			...(duration > 0 && { duration }),
 			metadata: {},
 		};
 		dispatch(ADD_AUDIO, {
