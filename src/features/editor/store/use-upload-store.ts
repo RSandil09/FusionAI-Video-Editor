@@ -166,17 +166,19 @@ export const useUploadStore = create<UploadStore>()((set, get) => ({
 					repairedUrl = repairedUrl.replace(OLD_BUCKET, NEW_BUCKET);
 				}
 
-				// Proxy R2 media through our API so CORS headers are applied.
-				// Use an absolute URL so Remotion Lambda (which has no app base URL)
-				// can resolve it correctly.
+				// Proxy R2 media through our API using relative URLs.
+				// Relative URLs keep @designcombo/state from using crossOrigin="anonymous"
+				// (it only does that for absolute/external URLs), so dimension measurement
+				// works without needing CORS headers. For export, VideoComposition
+				// resolveTrackItemSrcs() strips the proxy prefix and image.tsx /
+				// video.tsx guard against re-wrapping during isRendering.
 				if (repairedUrl && repairedUrl.includes(".r2.dev")) {
-					const origin = typeof window !== "undefined" ? window.location.origin : "";
 					const isVideo =
 						asset.content_type?.startsWith("video/") ||
 						/\.(mp4|webm|mov|avi|mkv)$/i.test(asset.file_name);
 					repairedUrl = isVideo
-						? `${origin}/api/video-proxy?url=${encodeURIComponent(repairedUrl)}`
-						: `${origin}/api/image-proxy?url=${encodeURIComponent(repairedUrl)}`;
+						? `/api/video-proxy?url=${encodeURIComponent(repairedUrl)}`
+						: `/api/image-proxy?url=${encodeURIComponent(repairedUrl)}`;
 				}
 
 				return {

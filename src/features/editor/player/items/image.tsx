@@ -4,24 +4,25 @@ import { BoxAnim, ContentAnim, MaskAnim } from "@designcombo/animations";
 import { buildFilter, calculateContainerStyles, calculateMediaStyles } from "../styles";
 import { getAnimations } from "../../utils/get-animations";
 import { calculateFrames } from "../../utils/frames";
-import { Img } from "remotion";
+import { Img, getRemotionEnvironment } from "remotion";
 
 // Ensure image URL is proxied for CORS support (browser only).
-// During Remotion Lambda render the proxy is unreachable, so direct URLs are
-// used as-is — VideoComposition.resolveTrackItemSrcs strips proxy wrappers
-// before passing URLs to the render pipeline.
+// During Remotion Lambda render, VideoComposition.resolveTrackItemSrcs() has
+// already resolved any proxy URL back to the direct R2 URL — return it as-is.
+// Without this guard, the direct R2 URL gets re-wrapped in a relative proxy
+// path that Lambda resolves against its S3 host, causing export failures.
 function ensureProxiedUrl(src: string): string {
 	if (!src) return src;
+
+	// Skip proxy logic entirely during Lambda / CLI rendering.
+	if (getRemotionEnvironment().isRendering) return src;
 
 	// Already going through a proxy route — leave as-is.
 	if (src.includes("/api/image-proxy") || src.includes("/api/video-proxy")) {
 		return src;
 	}
 
-	// R2 check BEFORE the generic https:// guard.
-	// Bug that was here: absolute R2 URLs (https://pub-xxx.r2.dev/...) were
-	// caught by the startsWith("https://") early-return and served without the
-	// proxy, causing CORS failures for crossOrigin="anonymous" image requests.
+	// Wrap R2 URLs in proxy for browser CORS support.
 	if (src.includes(".r2.dev")) {
 		return `/api/image-proxy?url=${encodeURIComponent(src)}`;
 	}
